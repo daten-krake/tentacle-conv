@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"github.com/tentacle-conv/model"
-
 	"gopkg.in/yaml.v3"
 )
 
