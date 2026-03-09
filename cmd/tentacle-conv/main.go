@@ -7,13 +7,10 @@ import (
 	"log"
 	"os"
 
+	"github.com/tentacle-conv/model"
+
 	"gopkg.in/yaml.v3"
 )
-
-type testconv struct {
-	Name string `json:"name" yaml:"name"`
-	Test string `json:"test" yaml:"test"`
-}
 
 var (
 	outpath string
@@ -31,7 +28,7 @@ func main() {
 	if outpath == "" {
 		log.Fatal("please add a out path")
 	}
-	test := testconv{}
+	test := model.Testconv{}
 	f, err := os.ReadFile(file)
 	if err != nil {
 		log.Fatal(err)
