@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/tentacle-conv/model"
+	"github.com/tentacle-conv/internal/model"
 	"gopkg.in/yaml.v3"
 )
 
