@@ -1,51 +1,39 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
-	"os"
 
+	"github.com/tentacle-conv/internal/conversion"
 	"github.com/tentacle-conv/internal/model"
-	"gopkg.in/yaml.v3"
 )
 
 var (
 	outpath string
 	file    string
+	array   bool
 )
 
 func main() {
+	// TODO clean up usage and help
 	flag.StringVar(&file, "file", "", "testing: a path to file")
 	flag.StringVar(&outpath, "outpath", "", "testing: add a out path")
+	flag.BoolVar(&array, "array", false, "temporary solution, use if you want to convert an array into multiple yaml")
 	flag.Parse()
 
+	// simple health empty check
 	if file == "" {
 		log.Fatal("please reference a file")
 	}
 	if outpath == "" {
 		log.Fatal("please add a out path")
 	}
-	test := model.Testconv{}
-	f, err := os.ReadFile(file)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = json.Unmarshal(f, &test)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("read in: " + file)
-
-	yamlout, err := yaml.Marshal(test)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = os.WriteFile(outpath, yamlout, 0o644)
-	if err != nil {
-		log.Fatal(err)
+	// check for array conversion or single
+	if array {
+		test := []model.Testconv{}
+		conversion.MultiJSONtoYAML(outpath, file, test)
+	} else {
+		test := model.Testconv{}
+		conversion.SingleJSONtoYAML(outpath, file, test)
 	}
 }
