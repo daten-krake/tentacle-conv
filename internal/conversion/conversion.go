@@ -32,29 +32,49 @@ func SingleJSONtoYAML(outpath string, file string, test model.Testconv) {
 	}
 }
 
-func MultiJSONtoYAML(outpath string, file string, test []model.Testconv) {
+// rework to arm exported rules
+func MultiJSONtoYAML(outpath string, file string, arm model.ARMTemplate) {
 	f, err := os.ReadFile(file)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = json.Unmarshal(f, &test)
+	err = json.Unmarshal(f, &arm)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("read in: " + file)
 
-	for i := range test {
+	for i := range arm.Resources {
 
-		yamlout, err := yaml.Marshal(test[i])
+		yamlout, err := yaml.Marshal(ArmToAnalytic(arm.Resources[i].Properties))
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		err = os.WriteFile(outpath+test[i].Name, yamlout, 0o644)
+		err = os.WriteFile(outpath+arm.Resources[i].Properties.DisplayName+".yaml", yamlout, 0o644)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Error writing the file")
 		}
 
+	}
+}
+
+// build yaml layout from json
+func ArmToAnalytic(arm model.ARMProperties) model.Analytic {
+	return model.Analytic{
+		Name:           arm.DisplayName,
+		Severity:       arm.Severity,
+		Description:    arm.Description,
+		Query:          arm.Query,
+		QueryFrequency: arm.QueryFrequency,
+		QueryPeriod:    arm.QueryPeriod,
+		Mitre: []model.Mitre{
+			{
+				Tactics:    arm.Tactics,
+				Techniques: arm.Techniques,
+			},
+		},
+		// add the entity mapping with separat function
 	}
 }

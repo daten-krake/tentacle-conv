@@ -1,0 +1,44 @@
+id: ""
+name: Files_with_double_extensions
+severity: Medium
+fp_rate: ""
+permission_required: ""
+query: |-
+    DeviceProcessEvents
+    | where FileName endswith ".pdf.exe"
+        or FileName endswith ".doc.exe"
+        or FileName endswith ".docx.exe"
+        or FileName endswith ".mp3.exe"
+        or FileName endswith ".jpg.exe"
+        or FileName endswith ".jpeg.exe"
+        or FileName endswith ".html.exe"
+    | join kind = leftanti ( //  Excluding events where the activity triggered a Defender alert
+       SecurityAlert
+        | where ProviderName == "MDATP"
+        | where AlertSeverity != "Informational"
+        | where AlertName in ("Malicious File","Malicious file was observed")
+        | summarize by CompromisedEntity
+      )on $left.DeviceName == $right.CompromisedEntity
+    | extend AccountCustomEntity = AccountName,HostCustomEntity = DeviceName, FileCustomEntity = FileName, InitiatingProcessCustomEntity = InitiatingProcessCommandLine,  ProcessCustomEntity = ProcessCommandLine
+    | summarize by AccountCustomEntity, HostCustomEntity, FileCustomEntity, InitiatingProcessCustomEntity, ProcessCustomEntity
+query_frequency: PT20M
+query_period: PT20M
+query_language: ""
+query_platform: ""
+mitre:
+    - tactics:
+        - DefenseEvasion
+        - InitialAccess
+      techniques:
+        - T1036
+entity_mapping: []
+data_sources: []
+tags: []
+os_family: []
+description: 'Adversaries may abuse a double extension in the filename as a means of masquerading the true file type. A file name may include a secondary file type extension that may cause only the first extension to be displayed (ex: File.txt.exe may render in some views as just File.txt). However, the second extension is the true file type that determines how the file is opened and executed. This detection alerts on events with executable files with fairly common socially engineered double file extensions.'
+technical_description: ""
+considerations: ""
+false_positives: ""
+blindspots: ""
+response_plan: ""
+references: []

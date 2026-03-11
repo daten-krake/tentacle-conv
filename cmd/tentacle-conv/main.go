@@ -30,7 +30,7 @@ func main() {
 	}
 	// check for array conversion or single
 	if array {
-		test := []model.Testconv{}
+		test := model.ARMTemplate{}
 		conversion.MultiJSONtoYAML(outpath, file, test)
 	} else {
 		test := model.Testconv{}
