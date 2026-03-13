@@ -7,11 +7,6 @@ type Analytic struct {
 	Severity             string       `yaml:"severity"`
 	FPRate               string       `yaml:"fp_rate"`
 	PermissionRequired   string       `yaml:"permission_required"`
-	Query                string       `yaml:"query"`
-	QueryFrequency       string       `yaml:"query_frequency"`
-	QueryPeriod          string       `yaml:"query_period"`
-	QueryLanguage        string       `yaml:"query_language"`
-	QueryPlatform        string       `yaml:"query_platform"`
 	Mitre                []Mitre      `yaml:"mitre"`
 	EntityMapping        []Entities   `yaml:"entity_mapping"`
 	DataSources          []DataSource `yaml:"data_sources"`
@@ -24,6 +19,9 @@ type Analytic struct {
 	Blindspots           string       `yaml:"blindspots"`
 	ResponsePlan         string       `yaml:"response_plan"`
 	References           []string     `yaml:"references"`
+	Query                string       `yaml:"query"`
+	QueryFrequency       string       `yaml:"query_frequency"`
+	QueryPeriod          string       `yaml:"query_period"`
 }
 
 type Mitre struct {
