@@ -1,5 +1,5 @@
-id: ""
-name: Files_with_double_extensions
+id: "Files-with-double-extensions"
+name: Files-with-double-extensions
 severity: Medium
 fp_rate: ""
 permission_required: ""
