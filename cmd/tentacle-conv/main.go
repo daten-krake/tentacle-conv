@@ -20,7 +20,7 @@ func main() {
 	flag.StringVar(&file, "file", "", "testing: a path to file")
 	flag.StringVar(&outpath, "outpath", "", "testing: add a out path")
 	flag.BoolVar(&array, "array", false, "temporary solution, use if you want to convert an array into multiple yaml")
-	flag.StringVar(&mode, "mode", "yaml", "use for converting  yaml to json default is json to yaml")
+	flag.StringVar(&mode, "mode", "", "use for converting  yaml to json default is json to yaml")
 	flag.Parse()
 
 	// simple health empty check
@@ -30,6 +30,9 @@ func main() {
 	if outpath == "" {
 		log.Fatal("please add a out path")
 	}
+	if mode == "" {
+		log.Fatal("please select a mode")
+	}
 
 	// chek mode
 	if mode == "yaml" {
@@ -38,12 +41,16 @@ func main() {
 			test := model.ARMTemplate{}
 			conversion.MultiJSONtoYAML(outpath, file, test)
 		} else {
+			// needs to  be adjusted  for new model
 			test := model.Testconv{}
 			conversion.SingleJSONtoYAML(outpath, file, test)
 		}
-	} else {
+	} else if mode == "arm" {
 		test := model.Analytic{}
-		conversion.SingleYAMLtoJSON(outpath, file, test)
+		conversion.SingleYAMLtoARM(outpath, file, test)
 
+	} else if mode == "json" {
+		m := model.Analytic{}
+		conversion.SingleYAMLtoJSON(outpath, file, m)
 	}
 }

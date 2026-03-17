@@ -16,6 +16,7 @@ const (
 	ARMRuleType       = "Microsoft.OperationalInsights/workspaces/providers/alertRules"
 )
 
+// rework to more structured layout and single/2 methods with switch and arguments checking
 func SingleJSONtoYAML(outpath string, file string, test model.Testconv) {
 	f, err := os.ReadFile(file)
 	if err != nil {
@@ -66,7 +67,7 @@ func MultiJSONtoYAML(outpath string, file string, arm model.ARMTemplate) {
 	}
 }
 
-func SingleYAMLtoJSON(outpath string, file string, y model.Analytic) {
+func SingleYAMLtoARM(outpath string, file string, y model.Analytic) {
 	f, err := os.ReadFile(file)
 	if err != nil {
 		log.Fatal(err)
@@ -78,6 +79,28 @@ func SingleYAMLtoJSON(outpath string, file string, y model.Analytic) {
 	fmt.Println("read in: " + file)
 
 	jsonout, err := json.Marshal(yamlToArm(y))
+	if err != nil {
+		log.Fatal("error marshal the dst")
+	}
+
+	err = os.WriteFile(outpath+y.Name+".json", jsonout, 0o644)
+	if err != nil {
+		log.Fatal("error writing the file")
+	}
+}
+
+func SingleYAMLtoJSON(outpath string, file string, y model.Analytic) {
+	f, err := os.ReadFile(file)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = yaml.Unmarshal(f, &y)
+	if err != nil {
+		log.Fatal("Error Unmarshal the source ")
+	}
+	fmt.Println("read in: " + file)
+
+	jsonout, err := json.Marshal(yamlToJson(y))
 	if err != nil {
 		log.Fatal("error marshal the dst")
 	}
@@ -155,8 +178,27 @@ func yamlToArm(yaml model.Analytic) model.ARMTemplate {
 			},
 		},
 	}
+}
 
-	// add the entity mapping with separat function
+func yamlToJson(yaml model.Analytic) model.SentinelAlertRule {
+	return model.SentinelAlertRule{
+		Kind: "Scheduled",
+		Properties: model.SentinelRuleProperties{
+			DisplayName:         yaml.Name,
+			Description:         yaml.Description,
+			Severity:            yaml.Severity,
+			Enabled:             true,
+			Query:               yaml.Query,
+			QueryFrequency:      yaml.QueryFrequency,
+			QueryPeriod:         yaml.QueryPeriod,
+			TriggerOperator:     "GreaterThan",
+			TriggerThreshold:    0,
+			SuppressionEnabled:  false,
+			SuppressionDuration: "PT5H",
+			Tactics:             extractTactics(yaml.Mitre),
+			Techniques:          extractTechniques(yaml.Mitre),
+		},
+	}
 }
 
 func extractTactics(mitre []model.Mitre) []string {
