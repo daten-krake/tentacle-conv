@@ -1,5 +1,6 @@
 package conversion
 
+// t
 import (
 	"encoding/json"
 	"fmt"
@@ -16,6 +17,7 @@ const (
 	ARMRuleType       = "Microsoft.OperationalInsights/workspaces/providers/alertRules"
 )
 
+// split in go files needed this is a temp layout
 // rework to more structured layout and single/2 methods with switch and arguments checking
 func SingleJSONtoYAML(outpath string, file string, test model.Testconv) {
 	f, err := os.ReadFile(file)
@@ -111,6 +113,28 @@ func SingleYAMLtoJSON(outpath string, file string, y model.Analytic) {
 	}
 }
 
+func SingleYAMLtoBicep(outpath string, file string, y model.Analytic) {
+	f, err := os.ReadFile(file)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = yaml.Unmarshal(f, &y)
+	if err != nil {
+		log.Fatal("Error Unmarshal the source ")
+	}
+	fmt.Println("read in: " + file)
+
+	jsonout, err := json.Marshal(yamlToBicep(y))
+	if err != nil {
+		log.Fatal("error marshal the dst")
+	}
+
+	err = os.WriteFile(outpath+y.Name+".bicep", jsonout, 0o644)
+	if err != nil {
+		log.Fatal("error writing the file")
+	}
+}
+
 // build yaml layout from json
 func armToAnalytic(arm model.ARMProperties) model.Analytic {
 	return model.Analytic{
@@ -126,7 +150,7 @@ func armToAnalytic(arm model.ARMProperties) model.Analytic {
 				Techniques: arm.Techniques,
 			},
 		},
-		// add the entity mapping with separat function
+		EntityMapping: buildYamlEntityMappings(arm.EntityMappings),
 	}
 }
 
@@ -174,6 +198,7 @@ func yamlToArm(yaml model.Analytic) model.ARMTemplate {
 					EventGroupingSettings: model.EventGroupingSettings{
 						AggregationKind: "AlertPerResult",
 					},
+					EntityMappings: buildARMEntityMappings(yaml.EntityMapping),
 				},
 			},
 		},
@@ -201,6 +226,29 @@ func yamlToJson(yaml model.Analytic) model.SentinelAlertRule {
 	}
 }
 
+func yamlToBicep(yaml model.Analytic) model.BicepAlertRuleResource {
+	return model.BicepAlertRuleResource{
+		Name: yaml.Name,
+		Kind: "Scheduled",
+		Properties: model.AlertRuleProperties{
+			DisplayName:           yaml.Name,
+			Description:           yaml.Description,
+			Severity:              yaml.Severity,
+			Enabled:               true,
+			Query:                 yaml.Query,
+			QueryFrequency:        yaml.QueryFrequency,
+			QueryPeriod:           yaml.QueryPeriod,
+			TriggerOperator:       "GreaterThan",
+			TriggerThreshold:      0,
+			SuppressionEnabled:    false,
+			SuppressionDuration:   "PT5H",
+			Tactics:               extractTactics(yaml.Mitre),
+			Techniques:            extractTechniques(yaml.Mitre),
+			EventGroupingSettings: model.BEventGroupingSettings{AggregationKind: "AlertPerResult"},
+		},
+	}
+}
+
 func extractTactics(mitre []model.Mitre) []string {
 	tactics := []string{}
 	for _, m := range mitre {
@@ -217,8 +265,52 @@ func extractTechniques(mitre []model.Mitre) []string {
 	return tactics
 }
 
+// extract entities
+func buildYamlEntityMappings(input []model.ARMEntityMapping) []model.Entities {
+	var result []model.Entities
+
+	for _, em := range input {
+		entity := model.Entities{
+			EntityType: em.EntityType,
+		}
+
+		for _, fm := range em.FieldMappings {
+			entity.FieldMapping = append(entity.FieldMapping, model.Fieldmapping{
+				Identifier: fm.Identifier,
+				ColumnName: fm.ColumnName,
+			})
+		}
+
+		result = append(result, entity)
+	}
+
+	return result
+}
+
+// arm conversion
+func buildARMEntityMappings(input []model.Entities) []model.ARMEntityMapping {
+	var result []model.ARMEntityMapping
+
+	for _, em := range input {
+		entity := model.ARMEntityMapping{
+			EntityType: em.EntityType,
+		}
+
+		for _, fm := range em.FieldMapping {
+			entity.FieldMappings = append(entity.FieldMappings, model.ARMFieldMapping{
+				Identifier: fm.Identifier,
+				ColumnName: fm.ColumnName,
+			})
+		}
+
+		result = append(result, entity)
+	}
+
+	return result
+}
+
 func createARMId(model model.Analytic) string {
-	id := fmt.Sprintf("[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/%s')]", model.ID)
+	id := fmt.Sprintf("[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/%s')]", model.Name)
 	return id
 }
 
