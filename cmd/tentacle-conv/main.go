@@ -20,7 +20,7 @@ func main() {
 	flag.StringVar(&file, "file", "", "testing: a path to file")
 	flag.StringVar(&outpath, "outpath", "", "testing: add a out path")
 	flag.BoolVar(&array, "array", false, "temporary solution, use if you want to convert an array into multiple yaml")
-	flag.StringVar(&mode, "mode", "", "use for converting  yaml to json default is json to yaml")
+	flag.StringVar(&mode, "mode", "yaml", "use for converting  yaml to json default is json to yaml")
 	flag.Parse()
 
 	// simple health empty check
@@ -35,6 +35,7 @@ func main() {
 	}
 
 	// chek mode
+	// rework to switch you kek
 	if mode == "yaml" {
 		// check for array conversion or single
 		if array {
