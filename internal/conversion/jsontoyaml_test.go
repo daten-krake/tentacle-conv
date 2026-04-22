@@ -48,7 +48,7 @@ func TestArmToAnalytic(t *testing.T) {
 				EntityMapping: []model.Entities{
 					{
 						EntityType: "Account",
-						FieldMapping: []model.Fieldmapping{
+						FieldMapping: []model.FieldMapping{
 							{Identifier: "FullName", ColumnName: "AccountName"},
 						},
 					},
@@ -155,7 +155,7 @@ func TestBuildYamlEntityMappings(t *testing.T) {
 			expect: []model.Entities{
 				{
 					EntityType: "Account",
-					FieldMapping: []model.Fieldmapping{
+					FieldMapping: []model.FieldMapping{
 						{Identifier: "FullName", ColumnName: "AccountName"},
 					},
 				},
@@ -181,14 +181,14 @@ func TestBuildYamlEntityMappings(t *testing.T) {
 			expect: []model.Entities{
 				{
 					EntityType: "Host",
-					FieldMapping: []model.Fieldmapping{
+					FieldMapping: []model.FieldMapping{
 						{Identifier: "FullName", ColumnName: "Computer"},
 						{Identifier: "HostName", ColumnName: "HostName"},
 					},
 				},
 				{
 					EntityType: "IP",
-					FieldMapping: []model.Fieldmapping{
+					FieldMapping: []model.FieldMapping{
 						{Identifier: "Address", ColumnName: "IPAddress"},
 					},
 				},

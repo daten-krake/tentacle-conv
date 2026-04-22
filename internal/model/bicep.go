@@ -1,63 +1,48 @@
 package model
 
-// really needed ?
+// BicepAlertRuleResource represents a Bicep resource definition for a Sentinel
+// analytics rule.
 type BicepAlertRuleResource struct {
 	Name       string              `json:"name"`
 	Kind       string              `json:"kind"`
 	Properties AlertRuleProperties `json:"properties"`
 }
 
+// AlertRuleProperties holds the detection rule properties for a Bicep resource.
 type AlertRuleProperties struct {
-	DisplayName              string                 `json:"displayName"`
-	Description              string                 `json:"description"`
-	Severity                 string                 `json:"severity"`
-	Enabled                  bool                   `json:"enabled"`
-	Query                    string                 `json:"query"`
-	QueryFrequency           string                 `json:"queryFrequency"`
-	QueryPeriod              string                 `json:"queryPeriod"`
-	TriggerOperator          string                 `json:"triggerOperator"`
-	TriggerThreshold         int                    `json:"triggerThreshold"`
-	SuppressionDuration      string                 `json:"suppressionDuration"`
-	SuppressionEnabled       bool                   `json:"suppressionEnabled"`
-	StartTimeUtc             *string                `json:"startTimeUtc,omitempty"`
-	Tactics                  []string               `json:"tactics"`
-	Techniques               []string               `json:"techniques"`
-	SubTechniques            []string               `json:"subTechniques"`
-	AlertRuleTemplateName    string                 `json:"alertRuleTemplateName"`
-	IncidentConfiguration    IncidentConfiguration  `json:"incidentConfiguration"`
-	EventGroupingSettings    BEventGroupingSettings `json:"eventGroupingSettings"`
-	AlertDetailsOverride     interface{}            `json:"alertDetailsOverride"`
-	CustomDetails            interface{}            `json:"customDetails"`
-	EntityMappings           []EntityMapping        `json:"entityMappings"`
-	SentinelEntitiesMappings interface{}            `json:"sentinelEntitiesMappings"`
-	TemplateVersion          string                 `json:"templateVersion"`
+	DisplayName           string                 `json:"displayName"`
+	Description           string                 `json:"description"`
+	Severity              string                 `json:"severity"`
+	Enabled               bool                   `json:"enabled"`
+	Query                 string                 `json:"query"`
+	QueryFrequency        string                 `json:"queryFrequency"`
+	QueryPeriod           string                 `json:"queryPeriod"`
+	TriggerOperator       string                 `json:"triggerOperator"`
+	TriggerThreshold      int                    `json:"triggerThreshold"`
+	SuppressionDuration   string                 `json:"suppressionDuration"`
+	SuppressionEnabled    bool                   `json:"suppressionEnabled"`
+	StartTimeUtc          *string                `json:"startTimeUtc,omitempty"`
+	Tactics               []string               `json:"tactics"`
+	Techniques            []string               `json:"techniques"`
+	SubTechniques         []string               `json:"subTechniques"`
+	AlertRuleTemplateName string                 `json:"alertRuleTemplateName"`
+	IncidentConfiguration IncidentConfiguration  `json:"incidentConfiguration"`
+	EventGroupingSettings EventGroupingSettings  `json:"eventGroupingSettings"`
+	AlertDetailsOverride  any                    `json:"alertDetailsOverride"`
+	CustomDetails         any                    `json:"customDetails"`
+	EntityMappings        []BicepEntityMapping   `json:"entityMappings"`
+	SentinelEntitiesMappings any                 `json:"sentinelEntitiesMappings"`
+	TemplateVersion       string                 `json:"templateVersion"`
 }
 
-type BIncidentConfiguration struct {
-	CreateIncident        bool                  `json:"createIncident"`
-	GroupingConfiguration GroupingConfiguration `json:"groupingConfiguration"`
+// BicepEntityMapping maps an entity type to its field mappings in Bicep format.
+type BicepEntityMapping struct {
+	EntityType    string              `json:"entityType"`
+	FieldMappings []BicepFieldMapping `json:"fieldMappings"`
 }
 
-type BGroupingConfiguration struct {
-	Enabled              bool     `json:"enabled"`
-	ReopenClosedIncident bool     `json:"reopenClosedIncident"`
-	LookbackDuration     string   `json:"lookbackDuration"`
-	MatchingMethod       string   `json:"matchingMethod"`
-	GroupByEntities      []string `json:"groupByEntities"`
-	GroupByAlertDetails  []string `json:"groupByAlertDetails"`
-	GroupByCustomDetails []string `json:"groupByCustomDetails"`
-}
-
-type BEventGroupingSettings struct {
-	AggregationKind string `json:"aggregationKind"`
-}
-
-type EntityMapping struct {
-	EntityType    string         `json:"entityType"`
-	FieldMappings []FieldMapping `json:"fieldMappings"`
-}
-
-type FieldMapping struct {
+// BicepFieldMapping maps an identifier to a column name in Bicep format.
+type BicepFieldMapping struct {
 	Identifier string `json:"identifier"`
 	ColumnName string `json:"columnName"`
 }

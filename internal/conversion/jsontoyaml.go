@@ -2,60 +2,78 @@ package conversion
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/tentacle-conv/internal/model"
 	"gopkg.in/yaml.v3"
 )
 
-func SingleJSONtoYAML(outpath string, file string, test model.Testconv) {
+// SingleJSONtoYAML reads a single JSON file and writes the corresponding YAML
+// representation to outpath.
+func SingleJSONtoYAML(outpath string, file string) error {
 	f, err := os.ReadFile(file)
 	if err != nil {
-		log.Fatal(err)
-	}
-	err = json.Unmarshal(f, &test)
-	if err != nil {
-		log.Fatal(err)
-	}
-	println("read in: " + file)
-
-	yamlout, err := yaml.Marshal(test)
-	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("reading file %s: %w", file, err)
 	}
 
-	err = os.WriteFile(outpath+test.Name, yamlout, 0o644)
+	var data map[string]any
+	err = json.Unmarshal(f, &data)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("unmarshaling JSON from %s: %w", file, err)
 	}
+	log.Println("read in: " + file)
+
+	yamlout, err := yaml.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("marshaling YAML: %w", err)
+	}
+
+	name, _ := data["name"].(string)
+	if name == "" {
+		name = filepath.Base(file)
+	}
+
+	outFile := filepath.Join(outpath, name+".yaml")
+	err = os.WriteFile(outFile, yamlout, 0o644)
+	if err != nil {
+		return fmt.Errorf("writing file %s: %w", outFile, err)
+	}
+	return nil
 }
 
-func MultiJSONtoYAML(outpath string, file string, arm model.ARMTemplate) {
+// MultiJSONtoYAML reads an ARM template JSON containing multiple resources and
+// writes each as a separate YAML file to outpath.
+func MultiJSONtoYAML(outpath string, file string, arm model.ARMTemplate) error {
 	f, err := os.ReadFile(file)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("reading file %s: %w", file, err)
 	}
 
 	err = json.Unmarshal(f, &arm)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("unmarshaling JSON from %s: %w", file, err)
 	}
-	println("read in: " + file)
+	log.Println("read in: " + file)
 
 	for i := range arm.Resources {
 		yamlout, err := yaml.Marshal(armToAnalytic(arm.Resources[i].Properties))
 		if err != nil {
-			log.Fatal(err)
+			return fmt.Errorf("marshaling YAML for resource %d: %w", i, err)
 		}
 
-		err = os.WriteFile(outpath+arm.Resources[i].Properties.DisplayName+".yaml", yamlout, 0o644)
+		outFile := filepath.Join(outpath, arm.Resources[i].Properties.DisplayName+".yaml")
+		err = os.WriteFile(outFile, yamlout, 0o644)
 		if err != nil {
-			log.Fatalf("Error writing the file")
+			return fmt.Errorf("writing file %s: %w", outFile, err)
 		}
 	}
+	return nil
 }
 
+// armToAnalytic converts ARM template properties into a prodyaml Analytic model.
 func armToAnalytic(arm model.ARMProperties) model.Analytic {
 	return model.Analytic{
 		Name:           arm.DisplayName,
@@ -74,6 +92,8 @@ func armToAnalytic(arm model.ARMProperties) model.Analytic {
 	}
 }
 
+// buildYamlEntityMappings converts a slice of ARM entity mappings to the
+// prodyaml entity format.
 func buildYamlEntityMappings(input []model.ARMEntityMapping) []model.Entities {
 	var result []model.Entities
 
@@ -83,7 +103,7 @@ func buildYamlEntityMappings(input []model.ARMEntityMapping) []model.Entities {
 		}
 
 		for _, fm := range em.FieldMappings {
-			entity.FieldMapping = append(entity.FieldMapping, model.Fieldmapping{
+			entity.FieldMapping = append(entity.FieldMapping, model.FieldMapping{
 				Identifier: fm.Identifier,
 				ColumnName: fm.ColumnName,
 			})

@@ -1,6 +1,8 @@
 package model
 
-// original idea  from here https://github.com/FalconForceTeam/FalconForge/blob/main/usecases/0xFF-0239-Discovery_Commands_Executed_from_Instance_Profile-AWS/usecase.yml
+// Analytic represents a detection rule in the prodyaml format, which serves as
+// the canonical internal representation for conversion to other formats.
+// Based on https://github.com/FalconForceTeam/FalconForge/blob/main/usecases/0xFF-0239-Discovery_Commands_Executed_from_Instance_Profile-AWS/usecase.yml
 type Analytic struct {
 	ID                   string       `yaml:"id"`
 	Name                 string       `yaml:"name"`
@@ -24,23 +26,27 @@ type Analytic struct {
 	QueryPeriod          string       `yaml:"query_period"`
 }
 
+// Mitre holds MITRE ATT&CK tactics and techniques for a detection rule.
 type Mitre struct {
 	Tactics    []string `yaml:"tactics"`
 	Techniques []string `yaml:"techniques"`
 }
 
+// Entities maps an entity type to its field mappings in prodyaml format.
 type Entities struct {
-	EntityType   string         `yaml:"entity_type"`
-	FieldMapping []Fieldmapping `yaml:"field_mapping"`
+	EntityType  string         `yaml:"entity_type"`
+	FieldMapping []FieldMapping `yaml:"field_mapping"`
 }
 
-type Fieldmapping struct {
+// FieldMapping maps an identifier to a column name in prodyaml format.
+type FieldMapping struct {
 	Identifier string `yaml:"identifier"`
 	ColumnName string `yaml:"column_name"`
 }
 
+// DataSource describes the data source for a detection rule.
 type DataSource struct {
-	Provider  string
-	EventID   string
-	TableName string
+	Provider  string `yaml:"provider" json:"provider"`
+	EventID   string `yaml:"event_id" json:"event_id"`
+	TableName string `yaml:"table_name" json:"table_name"`
 }

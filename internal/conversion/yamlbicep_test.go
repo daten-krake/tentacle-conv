@@ -23,7 +23,7 @@ func TestYamlToBicep(t *testing.T) {
 		EntityMapping: []model.Entities{
 			{
 				EntityType: "Host",
-				FieldMapping: []model.Fieldmapping{
+				FieldMapping: []model.FieldMapping{
 					{Identifier: "FullName", ColumnName: "HostCustomEntity"},
 				},
 			},

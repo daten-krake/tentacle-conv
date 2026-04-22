@@ -1,12 +1,18 @@
 package model
 
+// ARMTemplate represents an Azure Resource Manager deployment template for
+// Sentinel analytics rules.
+// ARMTemplate represents an Azure Resource Manager deployment template for
+// Sentinel analytics rules.
 type ARMTemplate struct {
 	Schema         string        `json:"$schema"`
 	ContentVersion string        `json:"contentVersion"`
-	Parameters     interface{}   `json:"parameters"`
-	Resources      []ARMResource `json:"resources"`
+	Parameters    any           `json:"parameters"`
+	Resources     []ARMResource `json:"resources"`
 }
 
+// ARMResource represents a single resource within an ARM template.
+// ARMResource represents a single resource within an ARM template.
 type ARMResource struct {
 	ID         string        `json:"id"`
 	Name       string        `json:"name"`
@@ -16,6 +22,8 @@ type ARMResource struct {
 	Properties ARMProperties `json:"properties"`
 }
 
+// ARMProperties holds the detection rule properties within an ARM resource.
+// ARMProperties holds the detection rule properties within an ARM resource.
 type ARMProperties struct {
 	DisplayName           string                `json:"displayName"`
 	Description           string                `json:"description"`
@@ -32,34 +40,19 @@ type ARMProperties struct {
 	Techniques            []string              `json:"techniques"`
 	SubTechniques         []string              `json:"subTechniques"`
 	IncidentConfiguration IncidentConfiguration `json:"incidentConfiguration"`
-	EventGroupingSettings EventGroupingSettings `json:"eventGroupingSettings"`
-	EntityMappings        []ARMEntityMapping    `json:"entityMappings"`
+	EventGroupingSettings  EventGroupingSettings `json:"eventGroupingSettings"`
+	EntityMappings        []ARMEntityMapping   `json:"entityMappings"`
 }
 
-type IncidentConfiguration struct {
-	CreateIncident        bool                  `json:"createIncident"`
-	GroupingConfiguration GroupingConfiguration `json:"groupingConfiguration"`
-}
-
-type GroupingConfiguration struct {
-	Enabled              bool     `json:"enabled"`
-	ReopenClosedIncident bool     `json:"reopenClosedIncident"`
-	LookbackDuration     string   `json:"lookbackDuration"`
-	MatchingMethod       string   `json:"matchingMethod"`
-	GroupByEntities      []string `json:"groupByEntities"`
-	GroupByAlertDetails  []string `json:"groupByAlertDetails"`
-	GroupByCustomDetails []string `json:"groupByCustomDetails"`
-}
-
-type EventGroupingSettings struct {
-	AggregationKind string `json:"aggregationKind"`
-}
-
+// ARMEntityMapping maps an entity type to its field mappings in ARM format.
+// ARMEntityMapping maps an entity type to its field mappings in ARM format.
 type ARMEntityMapping struct {
 	EntityType    string            `json:"entityType"`
 	FieldMappings []ARMFieldMapping `json:"fieldMappings"`
 }
 
+// ARMFieldMapping maps an identifier to a column name in ARM format.
+// ARMFieldMapping maps an identifier to a column name in ARM format.
 type ARMFieldMapping struct {
 	Identifier string `json:"identifier"`
 	ColumnName string `json:"columnName"`

@@ -23,7 +23,7 @@ func sampleAnalytic() model.Analytic {
 		EntityMapping: []model.Entities{
 			{
 				EntityType: "Account",
-				FieldMapping: []model.Fieldmapping{
+				FieldMapping: []model.FieldMapping{
 					{Identifier: "FullName", ColumnName: "AccountName"},
 					{Identifier: "Name", ColumnName: "AccountShortName"},
 				},
@@ -180,7 +180,7 @@ func TestBuildARMEntityMappings(t *testing.T) {
 			input: []model.Entities{
 				{
 					EntityType: "Host",
-					FieldMapping: []model.Fieldmapping{
+					FieldMapping: []model.FieldMapping{
 						{Identifier: "FullName", ColumnName: "Computer"},
 					},
 				},

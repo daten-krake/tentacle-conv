@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/tentacle-conv/internal/model"
 	"gopkg.in/yaml.v3"
@@ -16,34 +17,40 @@ const (
 	ARMRuleType       = "Microsoft.OperationalInsights/workspaces/providers/alertRules"
 )
 
-func SingleYAMLtoARM(outpath string, file string, y model.Analytic) {
+// SingleYAMLtoARM reads a YAML analytic file, converts it to an ARM template
+// JSON, and writes the result to outpath.
+func SingleYAMLtoARM(outpath string, file string, y model.Analytic) error {
 	f, err := os.ReadFile(file)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("reading file %s: %w", file, err)
 	}
 	err = yaml.Unmarshal(f, &y)
 	if err != nil {
-		log.Fatal("Error Unmarshal the source ")
+		return fmt.Errorf("unmarshaling YAML from %s: %w", file, err)
 	}
-	println("read in: " + file)
+	log.Println("read in: " + file)
 
 	jsonout, err := json.Marshal(yamlToArm(y))
 	if err != nil {
-		log.Fatal("error marshal the dst")
+		return fmt.Errorf("marshaling JSON: %w", err)
 	}
 
-	err = os.WriteFile(outpath+y.Name+".json", jsonout, 0o644)
+	outFile := filepath.Join(outpath, y.Name+".json")
+	err = os.WriteFile(outFile, jsonout, 0o644)
 	if err != nil {
-		log.Fatal("error writing the file")
+		return fmt.Errorf("writing file %s: %w", outFile, err)
 	}
+	return nil
 }
 
+// yamlToArm maps a prodyaml Analytic model to a full ARM template including
+// default incident and grouping configuration.
 func yamlToArm(a model.Analytic) model.ARMTemplate {
 	return model.ARMTemplate{
 		Schema:         ARMSchema,
 		ContentVersion: ARMContentVersion,
-		Parameters: map[string]interface{}{
-			"workspace": map[string]interface{}{
+		Parameters: map[string]any{
+			"workspace": map[string]any{
 				"type": "String",
 			},
 		},
@@ -56,16 +63,16 @@ func yamlToArm(a model.Analytic) model.ARMTemplate {
 				APIVersion: "2023-12-01-preview",
 				Properties: model.ARMProperties{
 					DisplayName:         a.Name,
-					Description:        a.Description,
-					Severity:           a.Severity,
-					Enabled:            true,
-					QueryFrequency:     a.QueryFrequency,
-					QueryPeriod:        a.QueryPeriod,
-					Query:              a.Query,
-					Tactics:            extractTactics(a.Mitre),
-					Techniques:         extractTechniques(a.Mitre),
-					TriggerOperator:    "GreaterThan",
-					TriggerThreshold:   0,
+					Description:         a.Description,
+					Severity:            a.Severity,
+					Enabled:             true,
+					QueryFrequency:      a.QueryFrequency,
+					QueryPeriod:         a.QueryPeriod,
+					Query:               a.Query,
+					Tactics:             extractTactics(a.Mitre),
+					Techniques:          extractTechniques(a.Mitre),
+					TriggerOperator:     "GreaterThan",
+					TriggerThreshold:    0,
 					SuppressionDuration: "PT5H",
 					SuppressionEnabled:  false,
 					IncidentConfiguration: model.IncidentConfiguration{
@@ -86,6 +93,8 @@ func yamlToArm(a model.Analytic) model.ARMTemplate {
 	}
 }
 
+// buildARMEntityMappings converts a slice of prodyaml Entities to ARM entity
+// mappings.
 func buildARMEntityMappings(input []model.Entities) []model.ARMEntityMapping {
 	var result []model.ARMEntityMapping
 
@@ -107,10 +116,12 @@ func buildARMEntityMappings(input []model.Entities) []model.ARMEntityMapping {
 	return result
 }
 
+// createARMId generates an ARM template resource ID using the analytic name.
 func createARMId(a model.Analytic) string {
 	return fmt.Sprintf("[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/%s')]", a.Name)
 }
 
+// createARMName generates an ARM template resource name using the analytic name.
 func createARMName(a model.Analytic) string {
 	return fmt.Sprintf("[concat(parameters('workspace'),'/Microsoft.SecurityInsights/%s')]", a.Name)
 }

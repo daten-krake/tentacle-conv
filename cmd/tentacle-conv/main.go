@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
+	"os"
 
 	"github.com/tentacle-conv/internal/conversion"
 	"github.com/tentacle-conv/internal/model"
@@ -16,42 +18,37 @@ var (
 )
 
 func main() {
-	// TODO clean up usage and help
-	flag.StringVar(&file, "file", "", "testing: a path to file")
-	flag.StringVar(&outpath, "outpath", "", "testing: add a out path")
-	flag.BoolVar(&array, "array", false, "temporary solution, use if you want to convert an array into multiple yaml")
-	flag.StringVar(&mode, "mode", "yaml", "use for converting  yaml to json default is json to yaml")
+	flag.StringVar(&file, "file", "", "path to the input file")
+	flag.StringVar(&outpath, "outpath", "", "directory to write output files")
+	flag.BoolVar(&array, "array", false, "convert a JSON array into multiple YAML files")
+	flag.StringVar(&mode, "mode", "yaml", "conversion mode: yaml, arm, or json")
 	flag.Parse()
 
-	// simple health empty check
 	if file == "" {
-		log.Fatal("please reference a file")
+		log.Fatal("please reference a file with -file")
 	}
 	if outpath == "" {
-		log.Fatal("please add a out path")
-	}
-	if mode == "" {
-		log.Fatal("please select a mode")
+		log.Fatal("please specify an output path with -outpath")
 	}
 
-	// chek mode
-	// rework to switch you kek
-	if mode == "yaml" {
-		// check for array conversion or single
+	var err error
+	switch mode {
+	case "yaml":
 		if array {
-			test := model.ARMTemplate{}
-			conversion.MultiJSONtoYAML(outpath, file, test)
+			err = conversion.MultiJSONtoYAML(outpath, file, model.ARMTemplate{})
 		} else {
-			// needs to  be adjusted  for new model
-			test := model.Testconv{}
-			conversion.SingleJSONtoYAML(outpath, file, test)
+			err = conversion.SingleJSONtoYAML(outpath, file)
 		}
-	} else if mode == "arm" {
-		test := model.Analytic{}
-		conversion.SingleYAMLtoARM(outpath, file, test)
+	case "arm":
+		err = conversion.SingleYAMLtoARM(outpath, file, model.Analytic{})
+	case "json":
+		err = conversion.SingleYAMLtoJSON(outpath, file, model.Analytic{})
+	default:
+		fmt.Fprintf(os.Stderr, "unknown mode %q; supported modes: yaml, arm, json\n", mode)
+		os.Exit(1)
+	}
 
-	} else if mode == "json" {
-		m := model.Analytic{}
-		conversion.SingleYAMLtoJSON(outpath, file, m)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
