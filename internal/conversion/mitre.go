@@ -1,0 +1,19 @@
+package conversion
+
+import "github.com/tentacle-conv/internal/model"
+
+func extractTactics(mitre []model.Mitre) []string {
+	tactics := []string{}
+	for _, m := range mitre {
+		tactics = append(tactics, m.Tactics...)
+	}
+	return tactics
+}
+
+func extractTechniques(mitre []model.Mitre) []string {
+	techniques := []string{}
+	for _, m := range mitre {
+		techniques = append(techniques, m.Techniques...)
+	}
+	return techniques
+}
