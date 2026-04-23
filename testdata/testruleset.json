@@ -1,0 +1,542 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/PRI-AAD-07')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/PRI-AAD-07')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2023-12-01-preview",
+            "properties": {
+                "displayName": "Admin_promotion_after_Role_Management_Application_Permission_Grant",
+                "description": "This rule looks for a service principal being granted the Microsoft Graph RoleManagement.ReadWrite.Directory (application) permission before being used to add an Microsoft Entra ID object or user account to an Admin directory role (i.e. Global Administrators). This is a known attack path that is usually abused when a service principal already has the AppRoleAssignment.ReadWrite.All permission granted. This permission allows an app to manage permission grants for application permissions to any API. A service principal can promote itself or other service principals to admin roles (i.e. Global Administrators). This would be considered a privilege escalation technique.",
+                "severity": "High",
+                "enabled": true,
+                "query": "let query_frequency = 1h;\nlet query_period = 2h;\nAuditLogs\n| where ingestion_time() > ago(query_period)\n| where Category =~ \"ApplicationManagement\" and LoggedByService =~ \"Core Directory\"\n| where OperationName =~ \"Add app role assignment to service principal\"\n| mv-expand TargetResource = TargetResources\n| mv-expand modifiedProperty = TargetResource[\"modifiedProperties\"]\n| where tostring(modifiedProperty[\"displayName\"]) == \"AppRole.Value\"\n| extend PermissionGrant = tostring(modifiedProperty[\"newValue\"])\n| where PermissionGrant has \"RoleManagement.ReadWrite.Directory\"\n| mv-apply modifiedProperty = TargetResource[\"modifiedProperties\"] on (\n    summarize modifiedProperties = make_bag(\n        bag_pack(tostring(modifiedProperty[\"displayName\"]),\n            bag_pack(\"oldValue\", trim(@'[\\\"\\s]+', tostring(modifiedProperty[\"oldValue\"])),\n                \"newValue\", trim(@'[\\\"\\s]+', tostring(modifiedProperty[\"newValue\"])))), 100)\n)\n| project\n    PermissionGrant_TimeGenerated = TimeGenerated,\n    PermissionGrant_OperationName = OperationName,\n    PermissionGrant_Result = Result,\n    PermissionGrant,\n    AppDisplayName = tostring(modifiedProperties[\"ServicePrincipal.DisplayName\"][\"newValue\"]),\n    AppServicePrincipalId = tostring(modifiedProperties[\"ServicePrincipal.ObjectID\"][\"newValue\"]),\n    PermissionGrant_InitiatedBy = InitiatedBy,\n    PermissionGrant_TargetResources = TargetResources,\n    PermissionGrant_AdditionalDetails = AdditionalDetails,\n    PermissionGrant_CorrelationId = CorrelationId\n| join kind=inner (\n    AuditLogs\n    | where ingestion_time() > ago(query_frequency)\n    | where Category =~ \"RoleManagement\" and LoggedByService =~ \"Core Directory\" and AADOperationType =~ \"Assign\"\n    | where isnotempty(InitiatedBy[\"app\"])\n    | mv-expand TargetResource = TargetResources\n    | mv-expand modifiedProperty = TargetResource[\"modifiedProperties\"]\n    | where tostring(modifiedProperty[\"displayName\"]) in (\"Role.DisplayName\", \"RoleDefinition.DisplayName\")\n    | extend RoleAssignment = tostring(modifiedProperty[\"newValue\"])\n    | where RoleAssignment contains \"Admin\"\n    | project\n        RoleAssignment_TimeGenerated = TimeGenerated,\n        RoleAssignment_OperationName = OperationName,\n        RoleAssignment_Result = Result,\n        RoleAssignment,\n        TargetType = tostring(TargetResources[0][\"type\"]),\n        TargetName = iff(isnotempty(TargetResources[0][\"displayName\"]), tostring(TargetResources[0][\"displayName\"]), tolower(TargetResources[0][\"userPrincipalName\"])),\n        TargetId = tostring(TargetResources[0][\"id\"]),\n        RoleAssignment_InitiatedBy = InitiatedBy,\n        RoleAssignment_TargetResources = TargetResources,\n        RoleAssignment_AdditionalDetails = AdditionalDetails,\n        RoleAssignment_CorrelationId = CorrelationId,\n        AppServicePrincipalId = tostring(InitiatedBy[\"app\"][\"servicePrincipalId\"])\n    ) on AppServicePrincipalId\n| where PermissionGrant_TimeGenerated < RoleAssignment_TimeGenerated\n| project PermissionGrant_TimeGenerated, PermissionGrant_OperationName, PermissionGrant_Result, PermissionGrant, AppDisplayName, AppServicePrincipalId, PermissionGrant_InitiatedBy, PermissionGrant_TargetResources, PermissionGrant_AdditionalDetails, PermissionGrant_CorrelationId, RoleAssignment_TimeGenerated, RoleAssignment_OperationName, RoleAssignment_Result, RoleAssignment, TargetType, TargetName, TargetId, RoleAssignment_InitiatedBy, RoleAssignment_TargetResources, RoleAssignment_AdditionalDetails, RoleAssignment_CorrelationId\n| extend PermissionGrant_InitiatingUserPrincipalName = tostring(PermissionGrant_InitiatedBy.user.userPrincipalName)\n| extend PermissionGrant_InitiatingAadUserId = tostring(PermissionGrant_InitiatedBy.user.id)\n| extend PermissionGrant_InitiatingIpAddress = tostring(iff(isnotempty(PermissionGrant_InitiatedBy.user.ipAddress), PermissionGrant_InitiatedBy.user.ipAddress, PermissionGrant_InitiatedBy.app.ipAddress))  | extend RoleAssignment_InitiatingUserPrincipalName = tostring(RoleAssignment_InitiatedBy.user.userPrincipalName)\n| extend RoleAssignment_InitiatingAadUserId = tostring(RoleAssignment_InitiatedBy.user.id)\n| extend RoleAssignment_InitiatingIpAddress = tostring(iff(isnotempty(RoleAssignment_InitiatedBy.user.ipAddress), RoleAssignment_InitiatedBy.user.ipAddress, RoleAssignment_InitiatedBy.app.ipAddress))\n| extend PermissionGrant_AccountName = tostring(split(PermissionGrant_InitiatingUserPrincipalName, \"@\")[0]), PermissionGrant_AccountUPNSuffix = tostring(split(PermissionGrant_InitiatingUserPrincipalName, \"@\")[1]), RoleAssignment_AccountName = tostring(split(RoleAssignment_InitiatingUserPrincipalName, \"@\")[0]), RoleAssignment_AccountUPNSuffix = tostring(split(RoleAssignment_InitiatingUserPrincipalName, \"@\")[1])",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "PT2H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "startTimeUtc": null,
+                "tactics": [
+                    "Persistence",
+                    "PrivilegeEscalation"
+                ],
+                "techniques": [
+                    "T1098",
+                    "T1078"
+                ],
+                "subTechniques": [],
+                "alertRuleTemplateName": null,
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": true,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "P7D",
+                        "matchingMethod": "Selected",
+                        "groupByEntities": [
+                            "Account"
+                        ],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Name",
+                                "columnName": "AppDisplayName"
+                            },
+                            {
+                                "identifier": "AadUserId",
+                                "columnName": "AppServicePrincipalId"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "TargetName"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "PermissionGrant_InitiatingUserPrincipalName"
+                            },
+                            {
+                                "identifier": "Name",
+                                "columnName": "PermissionGrant_AccountName"
+                            },
+                            {
+                                "identifier": "UPNSuffix",
+                                "columnName": "PermissionGrant_AccountUPNSuffix"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "RoleAssignment_InitiatingUserPrincipalName"
+                            },
+                            {
+                                "identifier": "Name",
+                                "columnName": "RoleAssignment_AccountName"
+                            },
+                            {
+                                "identifier": "UPNSuffix",
+                                "columnName": "RoleAssignment_AccountUPNSuffix"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "PermissionGrant_InitiatingIpAddress"
+                            }
+                        ]
+                    }
+                ],
+                "sentinelEntitiesMappings": null,
+                "templateVersion": null
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/EVA-MDFE-01')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/EVA-MDFE-01')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2023-12-01-preview",
+            "properties": {
+                "displayName": "Files_with_double_extensions",
+                "description": "Adversaries may abuse a double extension in the filename as a means of masquerading the true file type. A file name may include a secondary file type extension that may cause only the first extension to be displayed (ex: File.txt.exe may render in some views as just File.txt). However, the second extension is the true file type that determines how the file is opened and executed. This detection alerts on events with executable files with fairly common socially engineered double file extensions.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "DeviceProcessEvents\n| where FileName endswith \".pdf.exe\"\n    or FileName endswith \".doc.exe\"\n    or FileName endswith \".docx.exe\"\n    or FileName endswith \".mp3.exe\"\n    or FileName endswith \".jpg.exe\"\n    or FileName endswith \".jpeg.exe\"\n    or FileName endswith \".html.exe\"\n| join kind = leftanti ( //  Excluding events where the activity triggered a Defender alert\n   SecurityAlert\n    | where ProviderName == \"MDATP\"\n    | where AlertSeverity != \"Informational\"\n    | where AlertName in (\"Malicious File\",\"Malicious file was observed\")\n    | summarize by CompromisedEntity\n  )on $left.DeviceName == $right.CompromisedEntity\n| extend AccountCustomEntity = AccountName,HostCustomEntity = DeviceName, FileCustomEntity = FileName, InitiatingProcessCustomEntity = InitiatingProcessCommandLine,  ProcessCustomEntity = ProcessCommandLine\n| summarize by AccountCustomEntity, HostCustomEntity, FileCustomEntity, InitiatingProcessCustomEntity, ProcessCustomEntity",
+                "queryFrequency": "PT20M",
+                "queryPeriod": "PT20M",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "startTimeUtc": null,
+                "tactics": [
+                    "DefenseEvasion",
+                    "InitialAccess"
+                ],
+                "techniques": [
+                    "T1036"
+                ],
+                "subTechniques": [],
+                "alertRuleTemplateName": null,
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": true,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "P7D",
+                        "matchingMethod": "Selected",
+                        "groupByEntities": [
+                            "Host"
+                        ],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "AlertPerResult"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "HostCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "AccountCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Process",
+                        "fieldMappings": [
+                            {
+                                "identifier": "CommandLine",
+                                "columnName": "ProcessCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Process",
+                        "fieldMappings": [
+                            {
+                                "identifier": "CommandLine",
+                                "columnName": "InitiatingProcessCustomEntity"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "File",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Name",
+                                "columnName": "FileCustomEntity"
+                            }
+                        ]
+                    }
+                ],
+                "sentinelEntitiesMappings": null,
+                "templateVersion": null
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/LAT-AD-04')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/LAT-AD-04')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2023-12-01-preview",
+            "properties": {
+                "displayName": "Gain_Code_Execution_on_ADFS_Server_via_SMB_Remote_Service_or_Scheduled_Task",
+                "description": "This query detects instances where an attacker has gained the ability to execute code on an ADFS Server through SMB and Remote Service or Scheduled Task.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let timeframe = 1d;\n// Adjust for a longer timeframe for identifying ADFS Servers\nlet lookback = 6d;\n// Identify ADFS Servers\nlet ADFS_Servers = materialize(\nSecurityEvent\n| where ingestion_time() > ago(timeframe+lookback)\n| where EventID == 4688 and SubjectLogonId != \"0x3e4\"\n| where NewProcessName has \"Microsoft.IdentityServer.ServiceHost.exe\"\n| distinct Computer);\nSecurityEvent\n| where ingestion_time() > ago(timeframe)\n| where Computer in~ (ADFS_Servers)\n| where Account !endswith \"$\"\n// Check for scheduled task events\n| where EventID in (4697, 4698, 4699, 4700, 4701, 4702)\n| extend EventDataParsed = parse_xml(EventData)\n| extend SubjectLogonId = tostring(EventDataParsed.EventData.Data[3][\"#text\"])\n// Check specifically for access to IPC$ share and PIPE\\svcctl and PIPE\\atsvc for Service Control Services and Schedule Control Services\n| union (\n    SecurityEvent\n    | where ingestion_time() > ago(timeframe)\n    | where Computer in~ (ADFS_Servers)\n    | where Account !endswith \"$\"\n    | where EventID == 5145\n    | where RelativeTargetName =~ \"svcctl\" or RelativeTargetName  =~ \"atsvc\"\n)\n// Check for lateral movement\n| join kind=inner\n(SecurityEvent\n| where ingestion_time() > ago(timeframe)\n| where Account !endswith \"$\"\n| where EventID == 4624 and LogonType == 3\n) on $left.SubjectLogonId == $right.TargetLogonId\n| summarize by TimeGenerated, Account, Computer, EventID, RelativeTargetName\n| join kind = leftanti // Excluding events where the activity triggered a Defender alert\n(SecurityAlert\n    | where (ProviderName == \"MDATP\" and AlertName =~ \"Suspicious process related to remote code execution on privileged server\") or (ProviderName == \"Azure Advanced Threat Protection\" and AlertName contains \"Remote code execution\")\n    | where AlertSeverity != \"Informational\"\n    | summarize by CompromisedEntity\n  )on $left.Computer == $right.CompromisedEntity\n| extend timestamp = TimeGenerated\n| extend HostName = tostring(split(Computer, \".\")[0]), DomainIndex = toint(indexof(Computer, '.'))\n| extend HostNameDomain = iff(DomainIndex != -1, substring(Computer, DomainIndex + 1), Computer)\n| extend AccountName = tostring(split(Account, @'\\')[1]), AccountNTDomain = tostring(split(Account, @'\\')[0])",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P7D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "startTimeUtc": null,
+                "tactics": [
+                    "LateralMovement"
+                ],
+                "techniques": [
+                    "T1210"
+                ],
+                "subTechniques": [],
+                "alertRuleTemplateName": null,
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": true,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "P7D",
+                        "matchingMethod": "Selected",
+                        "groupByEntities": [
+                            "Host"
+                        ],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "Account"
+                            },
+                            {
+                                "identifier": "Name",
+                                "columnName": "AccountName"
+                            },
+                            {
+                                "identifier": "NTDomain",
+                                "columnName": "AccountNTDomain"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "Computer"
+                            },
+                            {
+                                "identifier": "HostName",
+                                "columnName": "HostName"
+                            },
+                            {
+                                "identifier": "DnsDomain",
+                                "columnName": "HostNameDomain"
+                            }
+                        ]
+                    }
+                ],
+                "sentinelEntitiesMappings": null,
+                "templateVersion": null
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/INA-AAD-07')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/INA-AAD-07')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2023-12-01-preview",
+            "properties": {
+                "displayName": "External_guest_invitation_followed_by_Azure_AD_PowerShell_signin",
+                "description": "By default guests have capability to invite more external guest users, guests also can do suspicious Azure AD enumeration. This detection look at guests users, who have been invited or have invited recently, who also are logging via various PowerShell CLI.",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let queryfrequency = 1h;\nlet queryperiod = 1d;\nAuditLogs\n| where ingestion_time() > ago(queryperiod)\n| where OperationName in (\"Invite external user\", \"Bulk invite users - started (bulk)\", \"Invite external user with reset invitation status\")\n| extend InitiatingAppName = tostring(InitiatedBy.app.displayName)\n| extend InitiatingAppServicePrincipalId = tostring(InitiatedBy.app.servicePrincipalId)\n| extend InitiatingUserPrincipalName = tostring(InitiatedBy.user.userPrincipalName)\n| extend InitiatingAadUserId = tostring(InitiatedBy.user.id)\n| extend InitiatingIpAddress = tostring(iff(isnotempty(InitiatedBy.user.ipAddress), InitiatedBy.user.ipAddress, InitiatedBy.app.ipAddress))\n| extend InitiatedBy = iff(isnotempty(InitiatedBy.user.userPrincipalName), InitiatedBy.user.userPrincipalName, InitiatedBy.app.displayName)\n// Uncomment the following line to filter events where the inviting user was a guest user\n//| where InitiatedBy has_any (\"live.com#\", \"#EXT#\")\n| mv-apply TargetResource = TargetResources on \n(\n    where TargetResource.type =~ \"User\"\n    | extend InvitedUser = tostring(TargetResource.userPrincipalName)\n)\n| mv-expand UserToCompare = pack_array(InitiatedBy, InvitedUser) to typeof(string)\n| where UserToCompare has_any (\"live.com#\", \"#EXT#\")\n| extend\n    parsedUser = replace_string(tolower(iff(UserToCompare startswith \"live.com#\", tostring(split(UserToCompare, \"#\")[1]), tostring(split(UserToCompare, \"#EXT#\")[0]))), \"@\", \"_\"),\n    InvitationTime = TimeGenerated\n| join kind = inner (\n    (union isfuzzy=true SigninLogs, AADNonInteractiveUserSignInLogs)\n    | where ingestion_time() > ago(queryfrequency)\n    | where UserType != \"Member\"\n    | where AppId has_any                       // This web may contain a list of these apps: https://msshells.net/\n        (\"1b730954-1685-4b74-9bfd-dac224a7b894\",// Azure Active Directory PowerShell\n         \"04b07795-8ddb-461a-bbee-02f9e1bf7b46\",// Microsoft Azure CLI\n         \"1950a258-227b-4e31-a9cf-717495945fc2\",// Microsoft Azure PowerShell\n         \"a0c73c16-a7e3-4564-9a95-2bdf47383716\",// Microsoft Exchange Online Remote PowerShell\n         \"fb78d390-0c51-40cd-8e17-fdbfab77341b\",// Microsoft Exchange REST API Based Powershell\n         \"d1ddf0e4-d672-4dae-b554-9d5bdfd93547\",// Microsoft Intune PowerShell\n         \"9bc3ab49-b65d-410a-85ad-de819febfddc\",// Microsoft SharePoint Online Management Shell\n         \"12128f48-ec9e-42f0-b203-ea49fb6af367\",// MS Teams Powershell Cmdlets\n         \"23d8f6bd-1eb0-4cc2-a08c-7bf525c67bcd\",// Power BI PowerShell\n         \"31359c7f-bd7e-475c-86db-fdb8c937548e\",// PnP Management Shell\n         \"90f610bf-206d-4950-b61d-37fa6fd1b224\",// Aadrm Admin Powershell\n         \"14d82eec-204b-4c2f-b7e8-296a70dab67e\" // Microsoft Graph PowerShell\n         \"9cee029c-6210-4654-90bb-17e6e9d36617\" // Power Platform CLI - pac\"\n        )\n    | summarize arg_min(TimeGenerated, *) by UserPrincipalName\n    | extend\n        parsedUser = replace_string(tolower(UserPrincipalName), \"@\", \"_\"),\n        SigninTime = TimeGenerated\n    )\n    on parsedUser\n| project InvitationTime, InitiatedBy, InitiatingUserPrincipalName, InitiatingAadUserId, InitiatingAppName, InitiatingAppServicePrincipalId, InitiatingIpAddress, OperationName, InvitedUser, SigninTime, SigninCategory = Category1, SigninUserPrincipalName = UserPrincipalName, AppDisplayName, ResourceDisplayName, UserAgent, InvitationAdditionalDetails = AdditionalDetails, InvitationTargetResources = TargetResources\n| extend InvitedUserName = tostring(split(InvitedUser,'@',0)[0]), InvitedUserUPNSuffix = tostring(split(InvitedUser,'@',1)[0]), InitiatedByName = tostring(split(InitiatingUserPrincipalName,'@',0)[0]), InitiatedByUPNSuffix = tostring(split(InitiatingUserPrincipalName,'@',1)[0])",
+                "queryFrequency": "PT1H",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "startTimeUtc": null,
+                "tactics": [
+                    "InitialAccess",
+                    "Persistence"
+                ],
+                "techniques": [
+                    "T1078",
+                    "T1136"
+                ],
+                "subTechniques": [],
+                "alertRuleTemplateName": null,
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": true,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "P7D",
+                        "matchingMethod": "Selected",
+                        "groupByEntities": [
+                            "Account"
+                        ],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "AlertPerResult"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "InvitedUser"
+                            },
+                            {
+                                "identifier": "Name",
+                                "columnName": "InvitedUserName"
+                            },
+                            {
+                                "identifier": "UPNSuffix",
+                                "columnName": "InvitedUserUPNSuffix"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "InitiatingUserPrincipalName"
+                            },
+                            {
+                                "identifier": "Name",
+                                "columnName": "InitiatedByName"
+                            },
+                            {
+                                "identifier": "UPNSuffix",
+                                "columnName": "InitiatedByUPNSuffix"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "AadUserId",
+                                "columnName": "InitiatingAadUserId"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "AadUserId",
+                                "columnName": "InitiatingAppServicePrincipalId"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "InitiatingIpAddress"
+                            }
+                        ]
+                    }
+                ],
+                "sentinelEntitiesMappings": null,
+                "templateVersion": null
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/EXE-MDFE-04')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/EXE-MDFE-04')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2023-12-01-preview",
+            "properties": {
+                "displayName": "Potential_Lumma_stealer_activity_PowerShell_download",
+                "description": "Lumma Stealer, also known as LummaC2, is an information-stealing malware and has been observed being used as Malware-as-a-Service (MaaS). Lumma Stealer primarily targets cryptocurrency wallets, browser extensions and two-factor authentication (2FA), before ultimately stealing sensitive information from compromised machines. This use case detects alerts with medium severity from Defender for Endpoint indicative of Lumma Stealer activity and surfaces them as alerts with high severity.",
+                "severity": "High",
+                "enabled": true,
+                "query": "let queryFrequency = 5m;\nlet queryPeriod = 30m;\nlet MDELummaAlerts = materialize(SecurityAlert\n  | where ingestion_time() >ago(queryFrequency)\n  | where AlertName in (\n      'Suspicious process executed PowerShell command',\n      'Suspicious PowerShell download or encoded command execution'\n  )\n  | where AlertSeverity != 'High'\n  | extend entities = parse_json(Entities)\n  | mv-expand entities\n  | extend Host = iff(entities.Type == \"host\", strcat(entities.HostName, \".\", entities.DnsDomain), \"\")\n  | extend IP = iff(entities.Type == \"ip\", entities.Address, \"\")\n  | extend Account = iff(entities.Type == \"account\", iff(isnotempty(entities.UserPrincipalName),entities.UserPrincipalName,entities.Sid), \"\")\n  | extend Process = iff(entities.Type == \"process\", entities.CommandLine, \"\")\n  | summarize Hosts = make_set_if(Host,Host != \"\"), IPs = make_set_if(IP,IP != \"\"), Accounts = make_set_if(Account,Account != \"\"), Processes = make_set_if(Process,Process != \"\") by AlertName,SystemAlertId,ProviderName,AlertSeverity,AlertLink\n  | mv-expand Accounts, Hosts, IPs, Processes\n  | where Processes has_any (\"hidden\")\n  | where Processes has_any (\"FromBase64String\",\"Invoke-WebRequest\",\"Invoke-Expression\",\"iex\",\"iwr\"));\nlet HighSeverityIncidents = materialize(SecurityIncident\n  | where ingestion_time() >ago(queryPeriod)\n  | summarize arg_max(TimeGenerated,IncidentNumber), Labels = make_set(Labels) by Severity, tostring(AlertIds), Title\n  | where Severity == 'High'\n  | where Labels contains \"escalated\"\n  | mv-expand todynamic(AlertIds)\n  | extend AlertId = tostring(AlertIds)\n  | summarize by IncidentTime = TimeGenerated, AlertId, Title, IncidentNumber, tostring(Labels), Severity);\nMDELummaAlerts\n  | join kind=leftanti HighSeverityIncidents on $left.SystemAlertId == $right.AlertId //ignore alerts which are contained in high severity incidents and have been escalated.\n  | summarize by AlertName, AlertSeverity, AlertLink, Host = tostring(Hosts), Account = tostring(Accounts), Process = tostring(Processes)\n  | extend AccountName = tostring(split(Account, \"@\")[0]), AccountUPNSuffix = tostring(split(Account, \"@\")[1])\n  | extend HostName= tostring(split(Host, '.', 0)[0]), DnsDomain = tostring(strcat_array(array_slice(split(Host, '.'), 1, -1), '.'))\n  | extend Url = extract(@\"https?:\\/\\/(?:www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b(?:[-a-zA-Z0-9()@:%_\\+.~#?&\\/=]*)\",0,Process)\n  | extend File = extract(@\"([^\\/.]+)$|([^\\/]+)(\\.[^\\/.]+)$\",0,Url)",
+                "queryFrequency": "PT5M",
+                "queryPeriod": "PT30M",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "startTimeUtc": null,
+                "tactics": [
+                    "Execution"
+                ],
+                "techniques": [
+                    "T1059"
+                ],
+                "subTechniques": [],
+                "alertRuleTemplateName": null,
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": true,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "P7D",
+                        "matchingMethod": "Selected",
+                        "groupByEntities": [
+                            "Host"
+                        ],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "AlertPerResult"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": [
+                    {
+                        "entityType": "Host",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "Host"
+                            },
+                            {
+                                "identifier": "HostName",
+                                "columnName": "HostName"
+                            },
+                            {
+                                "identifier": "DnsDomain",
+                                "columnName": "DnsDomain"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Account",
+                        "fieldMappings": [
+                            {
+                                "identifier": "FullName",
+                                "columnName": "Account"
+                            },
+                            {
+                                "identifier": "Name",
+                                "columnName": "AccountName"
+                            },
+                            {
+                                "identifier": "UPNSuffix",
+                                "columnName": "AccountUPNSuffix"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "Process",
+                        "fieldMappings": [
+                            {
+                                "identifier": "CommandLine",
+                                "columnName": "Process"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "File",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Name",
+                                "columnName": "File"
+                            }
+                        ]
+                    },
+                    {
+                        "entityType": "URL",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Url",
+                                "columnName": "Url"
+                            }
+                        ]
+                    }
+                ],
+                "sentinelEntitiesMappings": null,
+                "templateVersion": null
+            }
+        }
+    ]
+}
