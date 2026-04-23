@@ -1,0 +1,48 @@
+name: Convert ARM Templates to YAML
+
+on:
+  push:
+    paths:
+      - "arm/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build tentacle-conv
+        run: go build -o tentacle-conv ./cmd/tentacle-conv
+
+      - name: Ensure yaml output directory exists
+        run: mkdir -p yaml
+
+      - name: Convert ARM templates to YAML
+        run: |
+          shopt -s nullglob
+          for file in arm/*.json; do
+            echo "Converting $file"
+            ./tentacle-conv -mode yaml -array -file "$file" -outpath yaml/
+          done
+
+      - name: Commit converted YAML files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add yaml/
+          if git diff --cached --quiet; then
+            echo "No YAML changes to commit"
+          else
+            git commit -m "auto: convert ARM templates to YAML [skip ci]"
+            git push
+          fi
