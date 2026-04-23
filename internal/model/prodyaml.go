@@ -22,6 +22,7 @@ type Analytic struct {
 	ResponsePlan         string       `yaml:"response_plan"`
 	References           []string     `yaml:"references"`
 	Query                string       `yaml:"query"`
+	TestBlock            string       `yaml:"test_block"`
 	QueryFrequency       string       `yaml:"query_frequency"`
 	QueryPeriod          string       `yaml:"query_period"`
 }
