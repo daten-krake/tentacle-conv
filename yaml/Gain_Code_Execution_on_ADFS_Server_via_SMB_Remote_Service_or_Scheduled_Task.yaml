@@ -1,0 +1,85 @@
+id: ""
+name: Gain_Code_Execution_on_ADFS_Server_via_SMB_Remote_Service_or_Scheduled_Task
+severity: Medium
+fp_rate: ""
+permission_required: ""
+mitre:
+    - tactics:
+        - LateralMovement
+      techniques:
+        - T1210
+entity_mapping:
+    - entity_type: Account
+      field_mapping:
+        - identifier: FullName
+          column_name: Account
+        - identifier: Name
+          column_name: AccountName
+        - identifier: NTDomain
+          column_name: AccountNTDomain
+    - entity_type: Host
+      field_mapping:
+        - identifier: FullName
+          column_name: Computer
+        - identifier: HostName
+          column_name: HostName
+        - identifier: DnsDomain
+          column_name: HostNameDomain
+data_sources: []
+tags: []
+os_family: []
+description: This query detects instances where an attacker has gained the ability to execute code on an ADFS Server through SMB and Remote Service or Scheduled Task.
+technical_description: ""
+considerations: ""
+false_positives: ""
+blindspots: ""
+response_plan: ""
+references: []
+query: |-
+    let timeframe = 1d;
+    // Adjust for a longer timeframe for identifying ADFS Servers
+    let lookback = 6d;
+    // Identify ADFS Servers
+    let ADFS_Servers = materialize(
+    SecurityEvent
+    | where ingestion_time() > ago(timeframe+lookback)
+    | where EventID == 4688 and SubjectLogonId != "0x3e4"
+    | where NewProcessName has "Microsoft.IdentityServer.ServiceHost.exe"
+    | distinct Computer);
+    SecurityEvent
+    | where ingestion_time() > ago(timeframe)
+    | where Computer in~ (ADFS_Servers)
+    | where Account !endswith "$"
+    // Check for scheduled task events
+    | where EventID in (4697, 4698, 4699, 4700, 4701, 4702)
+    | extend EventDataParsed = parse_xml(EventData)
+    | extend SubjectLogonId = tostring(EventDataParsed.EventData.Data[3]["#text"])
+    // Check specifically for access to IPC$ share and PIPE\svcctl and PIPE\atsvc for Service Control Services and Schedule Control Services
+    | union (
+        SecurityEvent
+        | where ingestion_time() > ago(timeframe)
+        | where Computer in~ (ADFS_Servers)
+        | where Account !endswith "$"
+        | where EventID == 5145
+        | where RelativeTargetName =~ "svcctl" or RelativeTargetName  =~ "atsvc"
+    )
+    // Check for lateral movement
+    | join kind=inner
+    (SecurityEvent
+    | where ingestion_time() > ago(timeframe)
+    | where Account !endswith "$"
+    | where EventID == 4624 and LogonType == 3
+    ) on $left.SubjectLogonId == $right.TargetLogonId
+    | summarize by TimeGenerated, Account, Computer, EventID, RelativeTargetName
+    | join kind = leftanti // Excluding events where the activity triggered a Defender alert
+    (SecurityAlert
+        | where (ProviderName == "MDATP" and AlertName =~ "Suspicious process related to remote code execution on privileged server") or (ProviderName == "Azure Advanced Threat Protection" and AlertName contains "Remote code execution")
+        | where AlertSeverity != "Informational"
+        | summarize by CompromisedEntity
+      )on $left.Computer == $right.CompromisedEntity
+    | extend timestamp = TimeGenerated
+    | extend HostName = tostring(split(Computer, ".")[0]), DomainIndex = toint(indexof(Computer, '.'))
+    | extend HostNameDomain = iff(DomainIndex != -1, substring(Computer, DomainIndex + 1), Computer)
+    | extend AccountName = tostring(split(Account, @'\')[1]), AccountNTDomain = tostring(split(Account, @'\')[0])
+query_frequency: P1D
+query_period: P7D
