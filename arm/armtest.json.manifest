@@ -1,0 +1,27 @@
+{
+  "source_arm_path": "arm/armtest.json",
+  "source_sha256": "32436083a77a98957f450145e4f0671991197c18398a7ea3a75c655a372351fc",
+  "generated_yamls": [
+    {
+      "yaml_path": "yaml/Admin_promotion_after_Role_Management_Application_Permission_Grant.yaml",
+      "yaml_sha256": "9fcdbccd80c6dbd60c84847580e1beffd4a61a3585a8cec8637b812c98043032"
+    },
+    {
+      "yaml_path": "yaml/External_guest_invitation_followed_by_Azure_AD_PowerShell_signin.yaml",
+      "yaml_sha256": "d589a8bde3eb37a07d7b36e86024f1aeff77c22f2345cb329371ccdfcf48bd2b"
+    },
+    {
+      "yaml_path": "yaml/Files_with_double_extensions.yaml",
+      "yaml_sha256": "2d03d147e29291c77d9875090a12feaeb78bd119bf2af3dd40af740d805d3428"
+    },
+    {
+      "yaml_path": "yaml/Gain_Code_Execution_on_ADFS_Server_via_SMB_Remote_Service_or_Scheduled_Task.yaml",
+      "yaml_sha256": "371870736a3cf1973e1938a05469138480de4fa562d741686fc1fba22a0ed937"
+    },
+    {
+      "yaml_path": "yaml/Potential_Lumma_stealer_activity_PowerShell_download.yaml",
+      "yaml_sha256": "5b858e09cd8abb631a3b2f4b9fb3de875e198e267f032ab942779c6f597e59e9"
+    }
+  ],
+  "last_converted_at": "2026-04-26T07:55:08.470851Z"
+}

@@ -1,0 +1,87 @@
+id: ""
+name: Potential_Lumma_stealer_activity_PowerShell_download
+severity: High
+fp_rate: ""
+permission_required: ""
+mitre:
+    - tactics:
+        - Execution
+      techniques:
+        - T1059
+entity_mapping:
+    - entity_type: Host
+      field_mapping:
+        - identifier: FullName
+          column_name: Host
+        - identifier: HostName
+          column_name: HostName
+        - identifier: DnsDomain
+          column_name: DnsDomain
+    - entity_type: Account
+      field_mapping:
+        - identifier: FullName
+          column_name: Account
+        - identifier: Name
+          column_name: AccountName
+        - identifier: UPNSuffix
+          column_name: AccountUPNSuffix
+    - entity_type: Process
+      field_mapping:
+        - identifier: CommandLine
+          column_name: Process
+    - entity_type: File
+      field_mapping:
+        - identifier: Name
+          column_name: File
+    - entity_type: URL
+      field_mapping:
+        - identifier: Url
+          column_name: Url
+data_sources: []
+tags: []
+os_family: []
+description: Lumma Stealer, also known as LummaC2, is an information-stealing malware and has been observed being used as Malware-as-a-Service (MaaS). Lumma Stealer primarily targets cryptocurrency wallets, browser extensions and two-factor authentication (2FA), before ultimately stealing sensitive information from compromised machines. This use case detects alerts with medium severity from Defender for Endpoint indicative of Lumma Stealer activity and surfaces them as alerts with high severity.
+technical_description: ""
+considerations: ""
+false_positives: ""
+blindspots: ""
+response_plan: ""
+references: []
+query: |-
+    let queryFrequency = 5m;
+    let queryPeriod = 30m;
+    let MDELummaAlerts = materialize(SecurityAlert
+      | where ingestion_time() >ago(queryFrequency)
+      | where AlertName in (
+          'Suspicious process executed PowerShell command',
+          'Suspicious PowerShell download or encoded command execution'
+      )
+      | where AlertSeverity != 'High'
+      | extend entities = parse_json(Entities)
+      | mv-expand entities
+      | extend Host = iff(entities.Type == "host", strcat(entities.HostName, ".", entities.DnsDomain), "")
+      | extend IP = iff(entities.Type == "ip", entities.Address, "")
+      | extend Account = iff(entities.Type == "account", iff(isnotempty(entities.UserPrincipalName),entities.UserPrincipalName,entities.Sid), "")
+      | extend Process = iff(entities.Type == "process", entities.CommandLine, "")
+      | summarize Hosts = make_set_if(Host,Host != ""), IPs = make_set_if(IP,IP != ""), Accounts = make_set_if(Account,Account != ""), Processes = make_set_if(Process,Process != "") by AlertName,SystemAlertId,ProviderName,AlertSeverity,AlertLink
+      | mv-expand Accounts, Hosts, IPs, Processes
+      | where Processes has_any ("hidden")
+      | where Processes has_any ("FromBase64String","Invoke-WebRequest","Invoke-Expression","iex","iwr"));
+    let HighSeverityIncidents = materialize(SecurityIncident
+      | where ingestion_time() >ago(queryPeriod)
+      | summarize arg_max(TimeGenerated,IncidentNumber), Labels = make_set(Labels) by Severity, tostring(AlertIds), Title
+      | where Severity == 'High'
+      | where Labels contains "escalated"
+      | mv-expand todynamic(AlertIds)
+      | extend AlertId = tostring(AlertIds)
+      | summarize by IncidentTime = TimeGenerated, AlertId, Title, IncidentNumber, tostring(Labels), Severity);
+    MDELummaAlerts
+      | join kind=leftanti HighSeverityIncidents on $left.SystemAlertId == $right.AlertId //ignore alerts which are contained in high severity incidents and have been escalated.
+      | summarize by AlertName, AlertSeverity, AlertLink, Host = tostring(Hosts), Account = tostring(Accounts), Process = tostring(Processes)
+      | extend AccountName = tostring(split(Account, "@")[0]), AccountUPNSuffix = tostring(split(Account, "@")[1])
+      | extend HostName= tostring(split(Host, '.', 0)[0]), DnsDomain = tostring(strcat_array(array_slice(split(Host, '.'), 1, -1), '.'))
+      | extend Url = extract(@"https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*)",0,Process)
+      | extend File = extract(@"([^\/.]+)$|([^\/]+)(\.[^\/.]+)$",0,Url)
+test_block: ""
+query_frequency: PT5M
+query_period: PT30M
