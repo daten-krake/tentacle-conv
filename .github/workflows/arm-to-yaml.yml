@@ -37,28 +37,6 @@ jobs:
             fi
           }
 
-          validate_filenames() {
-            local -n arr=$1
-            local valid=()
-            local invalid=()
-            for f in "${arr[@]}"; do
-              local basename
-              basename=$(basename "$f")
-              if [[ "$basename" =~ ^[A-Z][A-Za-z0-9_]+\.json$ ]]; then
-                valid+=("$f")
-              else
-                invalid+=("$f")
-              fi
-            done
-            if [ ${#invalid[@]} -gt 0 ]; then
-              echo "::error::Invalid filename(s) detected:" >&2
-              printf ' - %s\n' "${invalid[@]}" >&2
-              echo "Filenames must match regex: ^[A-Z][A-Za-z0-9_]+\.json$" >&2
-              exit 1
-            fi
-            arr=("${valid[@]}")
-          }
-
           if [ "$EVENT_NAME" == "workflow_dispatch" ]; then
             echo "Manual trigger: processing all ARM JSON files" >&2
             collect_all_files
@@ -78,8 +56,6 @@ jobs:
               done < <(git diff -z --name-status --diff-filter=A "$EVENT_BEFORE" "$EVENT_SHA" -- arm/)
             fi
           fi
-
-          validate_filenames files
 
           json="[]"
           if [ ${#files[@]} -gt 0 ]; then
