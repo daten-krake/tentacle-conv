@@ -1,10 +1,10 @@
 {
   "source_arm_path": "arm/armtest.json",
-  "source_sha256": "32436083a77a98957f450145e4f0671991197c18398a7ea3a75c655a372351fc",
+  "source_sha256": "6e2b023c803a53b405b8077305c0cb01ab197fd574cae553b58684ea5b701a36",
   "generated_yamls": [
     {
       "yaml_path": "yaml/Admin_promotion_after_Role_Management_Application_Permission_Grant.yaml",
-      "yaml_sha256": "9fcdbccd80c6dbd60c84847580e1beffd4a61a3585a8cec8637b812c98043032"
+      "yaml_sha256": "4e3b1cf655834d154fdba6e5eb50ae89b17b256728e941095fb8ace8858a2f1e"
     },
     {
       "yaml_path": "yaml/External_guest_invitation_followed_by_Azure_AD_PowerShell_signin.yaml",
@@ -23,5 +23,5 @@
       "yaml_sha256": "5b858e09cd8abb631a3b2f4b9fb3de875e198e267f032ab942779c6f597e59e9"
     }
   ],
-  "last_converted_at": "2026-04-26T07:55:08.470851Z"
+  "last_converted_at": "2026-04-26T08:03:13.602414Z"
 }

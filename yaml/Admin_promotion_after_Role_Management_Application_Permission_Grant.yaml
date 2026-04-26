@@ -52,6 +52,7 @@ blindspots: ""
 response_plan: ""
 references: []
 query: |-
+    //test comment
     let query_frequency = 1h;
     let query_period = 2h;
     AuditLogs
