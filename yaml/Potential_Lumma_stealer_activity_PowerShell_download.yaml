@@ -1,5 +1,7 @@
 id: ""
 name: Potential_Lumma_stealer_activity_PowerShell_download
+state: prod
+maturity: analytic
 severity: High
 fp_rate: ""
 permission_required: ""

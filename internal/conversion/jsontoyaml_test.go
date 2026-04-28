@@ -34,6 +34,8 @@ func TestArmToAnalytic(t *testing.T) {
 			},
 			want: model.Analytic{
 				Name:           "Test_Rule",
+				State:          "",
+				Maturity:       "",
 				Severity:       "High",
 				Description:    "Test description",
 				Query:          "SecurityEvent | where EventID == 4624",
@@ -70,6 +72,8 @@ func TestArmToAnalytic(t *testing.T) {
 			},
 			want: model.Analytic{
 				Name:           "NoEntities",
+				State:          "",
+				Maturity:       "",
 				Severity:       "Medium",
 				Description:    "No entities",
 				Query:          "print 1",

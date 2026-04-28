@@ -2,8 +2,6 @@ package model
 
 // ARMTemplate represents an Azure Resource Manager deployment template for
 // Sentinel analytics rules.
-// ARMTemplate represents an Azure Resource Manager deployment template for
-// Sentinel analytics rules.
 type ARMTemplate struct {
 	Schema         string        `json:"$schema"`
 	ContentVersion string        `json:"contentVersion"`
@@ -11,7 +9,6 @@ type ARMTemplate struct {
 	Resources     []ARMResource `json:"resources"`
 }
 
-// ARMResource represents a single resource within an ARM template.
 // ARMResource represents a single resource within an ARM template.
 type ARMResource struct {
 	ID         string        `json:"id"`
@@ -22,7 +19,6 @@ type ARMResource struct {
 	Properties ARMProperties `json:"properties"`
 }
 
-// ARMProperties holds the detection rule properties within an ARM resource.
 // ARMProperties holds the detection rule properties within an ARM resource.
 type ARMProperties struct {
 	DisplayName           string                `json:"displayName"`
@@ -45,13 +41,11 @@ type ARMProperties struct {
 }
 
 // ARMEntityMapping maps an entity type to its field mappings in ARM format.
-// ARMEntityMapping maps an entity type to its field mappings in ARM format.
 type ARMEntityMapping struct {
 	EntityType    string            `json:"entityType"`
 	FieldMappings []ARMFieldMapping `json:"fieldMappings"`
 }
 
-// ARMFieldMapping maps an identifier to a column name in ARM format.
 // ARMFieldMapping maps an identifier to a column name in ARM format.
 type ARMFieldMapping struct {
 	Identifier string `json:"identifier"`

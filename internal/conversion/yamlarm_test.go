@@ -9,6 +9,8 @@ import (
 func sampleAnalytic() model.Analytic {
 	return model.Analytic{
 		Name:           "Test_Rule",
+		State:          "prod",
+		Maturity:       "analytic",
 		Severity:       "High",
 		Description:    "A test detection rule",
 		Query:          "SecurityEvent | where EventID == 4624",

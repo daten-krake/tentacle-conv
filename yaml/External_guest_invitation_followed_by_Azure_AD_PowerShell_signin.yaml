@@ -1,5 +1,7 @@
 id: ""
 name: External_guest_invitation_followed_by_Azure_AD_PowerShell_signin
+state: prod
+maturity: analytic
 severity: Medium
 fp_rate: ""
 permission_required: ""

@@ -21,7 +21,7 @@ func main() {
 	flag.StringVar(&file, "file", "", "path to the input file")
 	flag.StringVar(&outpath, "outpath", "", "directory to write output files")
 	flag.BoolVar(&array, "array", false, "convert a JSON array into multiple YAML files")
-	flag.StringVar(&mode, "mode", "yaml", "conversion mode: yaml, arm, or json")
+	flag.StringVar(&mode, "mode", "yaml", "conversion mode: yaml, arm, json, bicep")
 	flag.Parse()
 
 	if file == "" {
@@ -43,8 +43,10 @@ func main() {
 		err = conversion.SingleYAMLtoARM(outpath, file, model.Analytic{})
 	case "json":
 		err = conversion.SingleYAMLtoJSON(outpath, file, model.Analytic{})
+	case "bicep":
+		err = conversion.SingleYAMLtoBicep(outpath, file, model.Analytic{})
 	default:
-		fmt.Fprintf(os.Stderr, "unknown mode %q; supported modes: yaml, arm, json\n", mode)
+		fmt.Fprintf(os.Stderr, "unknown mode %q; supported modes: yaml, arm, json, bicep\n", mode)
 		os.Exit(1)
 	}
 

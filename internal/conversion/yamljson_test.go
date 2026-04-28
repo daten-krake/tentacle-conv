@@ -9,6 +9,8 @@ import (
 func TestYamlToJson(t *testing.T) {
 	a := model.Analytic{
 		Name:           "External_guest_sign_in",
+		State:          "prod",
+		Maturity:       "analytic",
 		Severity:       "Medium",
 		Description:    "Detects external guest invitations",
 		Query:          "AuditLogs | where OperationName == \"Invite external user\"",

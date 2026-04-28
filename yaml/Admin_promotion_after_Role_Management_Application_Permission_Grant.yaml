@@ -1,5 +1,7 @@
 id: ""
 name: Admin_promotion_after_Role_Management_Application_Permission_Grant
+state: prod
+maturity: analytic
 severity: High
 fp_rate: ""
 permission_required: ""

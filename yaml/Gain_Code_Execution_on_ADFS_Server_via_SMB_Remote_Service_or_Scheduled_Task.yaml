@@ -1,5 +1,7 @@
 id: ""
 name: Gain_Code_Execution_on_ADFS_Server_via_SMB_Remote_Service_or_Scheduled_Task
+state: prod
+maturity: analytic
 severity: Medium
 fp_rate: ""
 permission_required: ""

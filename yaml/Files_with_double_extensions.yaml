@@ -1,5 +1,7 @@
 id: ""
 name: Files_with_double_extensions
+state: prod
+maturity: analytic
 severity: Medium
 fp_rate: ""
 permission_required: ""

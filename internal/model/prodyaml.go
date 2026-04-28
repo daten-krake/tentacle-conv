@@ -6,6 +6,8 @@ package model
 type Analytic struct {
 	ID                   string       `yaml:"id"`
 	Name                 string       `yaml:"name"`
+	State                string       `yaml:"state"`
+	Maturity             string       `yaml:"maturity"`
 	Severity             string       `yaml:"severity"`
 	FPRate               string       `yaml:"fp_rate"`
 	PermissionRequired   string       `yaml:"permission_required"`
