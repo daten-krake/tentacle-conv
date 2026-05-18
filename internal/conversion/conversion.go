@@ -61,7 +61,7 @@ func MultiJSONtoYAML(outpath string, file string, arm model.ARMTemplate) {
 
 		err = os.WriteFile(outpath+arm.Resources[i].Properties.DisplayName+".yaml", yamlout, 0o644)
 		if err != nil {
-			log.Fatalf("Error writing the file")
+			log.Fatalf("Error writing the file: %s", arm.Resources[i].Properties.DisplayName)
 		}
 
 	}
