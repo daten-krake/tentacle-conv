@@ -4,29 +4,44 @@ package model
 // the canonical internal representation for conversion to other formats.
 // Based on https://github.com/FalconForceTeam/FalconForge/blob/main/usecases/0xFF-0239-Discovery_Commands_Executed_from_Instance_Profile-AWS/usecase.yml
 type Analytic struct {
-	ID                   string       `yaml:"id"`
-	Name                 string       `yaml:"name"`
-	State                string       `yaml:"state"`
-	Maturity             string       `yaml:"maturity"`
-	Severity             string       `yaml:"severity"`
-	FPRate               string       `yaml:"fp_rate"`
-	PermissionRequired   string       `yaml:"permission_required"`
-	Mitre                []Mitre      `yaml:"mitre"`
-	EntityMapping        []Entities   `yaml:"entity_mapping"`
-	DataSources          []DataSource `yaml:"data_sources"`
-	Tags                 []string     `yaml:"tags"`
-	OSFamily             []string     `yaml:"os_family"`
-	Description          string       `yaml:"description"`
-	TechnicalDescription string       `yaml:"technical_description"`
-	Considerations       string       `yaml:"considerations"`
-	FalsePositives       string       `yaml:"false_positives"`
-	Blindspots           string       `yaml:"blindspots"`
-	ResponsePlan         string       `yaml:"response_plan"`
-	References           []string     `yaml:"references"`
-	Query                string       `yaml:"query"`
-	TestBlock            string       `yaml:"test_block"`
-	QueryFrequency       string       `yaml:"query_frequency"`
-	QueryPeriod          string       `yaml:"query_period"`
+	ID                   string           `yaml:"id"`
+	Name                 string           `yaml:"name"`
+	State                string           `yaml:"state"`
+	Maturity             string           `yaml:"maturity"`
+	Severity             string           `yaml:"severity"`
+	FPRate               string           `yaml:"fp_rate"`
+	Owner                string           `yaml:"owner"`
+	Engine               string           `yaml:"engine"`
+	PermissionRequired   string           `yaml:"permission_required"`
+	Mitre                []Mitre          `yaml:"mitre"`
+	EntityMapping        []Entities       `yaml:"entity_mapping"`
+	DataSources          []DataSource     `yaml:"data_sources"`
+	Tags                 []string         `yaml:"tags"`
+	OSFamily             []string         `yaml:"os_family"`
+	Description          string           `yaml:"description"`
+	TechnicalDescription string           `yaml:"technical_description"`
+	Considerations       string           `yaml:"considerations"`
+	FalsePositives       string           `yaml:"false_positives"`
+	Blindspots           string           `yaml:"blindspots"`
+	ResponsePlan         string           `yaml:"response_plan"`
+	References           []string         `yaml:"references"`
+	Query                string           `yaml:"query"`
+	TestBlock            []TestBlockEntry `yaml:"testblock"`
+	QueryFrequency       string           `yaml:"query_frequency"`
+	QueryPeriod          string           `yaml:"query_period"`
+	Exclusions           []Exclusion      `yaml:"exclusions"`
+}
+
+// TestBlockEntry holds test data and expected alert count for a single test case.
+type TestBlockEntry struct {
+	TestData []string `yaml:"testdata"`
+	Expected int      `yaml:"expected"`
+}
+
+// Exclusion defines a per-entity-type exclusion list for allowlisting.
+type Exclusion struct {
+	EntityType string   `yaml:"entity_type"`
+	Values     []string `yaml:"values"`
 }
 
 // Mitre holds MITRE ATT&CK tactics and techniques for a detection rule.
