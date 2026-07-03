@@ -26,10 +26,10 @@ type Analytic struct {
 	ResponsePlan         string           `yaml:"response_plan"`
 	References           []string         `yaml:"references"`
 	Query                string           `yaml:"query"`
-	TestBlock            []TestBlockEntry `yaml:"testblock"`
 	QueryFrequency       string           `yaml:"query_frequency"`
 	QueryPeriod          string           `yaml:"query_period"`
 	Exclusions           []Exclusion      `yaml:"exclusions"`
+	TestBlock            []TestBlockEntry `yaml:"testblock"`
 }
 
 // TestBlockEntry holds test data and expected alert count for a single test case.
@@ -52,7 +52,7 @@ type Mitre struct {
 
 // Entities maps an entity type to its field mappings in prodyaml format.
 type Entities struct {
-	EntityType  string         `yaml:"entity_type"`
+	EntityType   string         `yaml:"entity_type"`
 	FieldMapping []FieldMapping `yaml:"field_mapping"`
 }
 
@@ -68,3 +68,4 @@ type DataSource struct {
 	EventID   string `yaml:"event_id" json:"event_id"`
 	TableName string `yaml:"table_name" json:"table_name"`
 }
+
