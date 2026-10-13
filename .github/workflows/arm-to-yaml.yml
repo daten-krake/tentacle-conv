@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   convert:
@@ -44,6 +45,7 @@ jobs:
       - name: Commit converted YAML files and manifests
         env:
           GITHUB_REF_NAME: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -56,4 +58,7 @@ jobs:
           else
             git commit -m "auto: convert ARM templates to YAML [skip ci]"
             git push origin "HEAD:${GITHUB_REF_NAME}"
+            # Pushes made with GITHUB_TOKEN don't trigger pull_request workflows,
+            # so start CI explicitly to report the required checks on the new head.
+            gh workflow run ci.yml --ref "${GITHUB_REF_NAME}"
           fi
