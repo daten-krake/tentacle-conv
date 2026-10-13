@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BICEP_VERSION: v0.30.23
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./... -race -count=1
+
+  conversion:
+    name: Conversion e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install Bicep CLI
+        run: |
+          curl -fsSLo /usr/local/bin/bicep \
+            "https://github.com/Azure/bicep/releases/download/${BICEP_VERSION}/bicep-linux-x64"
+          chmod +x /usr/local/bin/bicep
+          bicep --version
+
+      - name: Build tentacle-conv
+        run: go build -o tentacle-conv ./cmd/tentacle-conv
+
+      - name: Run conversion checks
+        env:
+          TENTACLE_CONV: ${{ github.workspace }}/tentacle-conv
+          REQUIRE_BICEP: "1"
+        run: bash scripts/e2e.sh
