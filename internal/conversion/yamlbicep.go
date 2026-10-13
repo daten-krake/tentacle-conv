@@ -29,13 +29,32 @@ var bicepFuncs = template.FuncMap{
 	"bicepEscape": func(s string) string {
 		return strings.ReplaceAll(s, "'", "''")
 	},
-	"bicepQuery": func(query string) string {
-		escaped := strings.ReplaceAll(query, "'", "''")
-		if strings.Contains(escaped, "\n") {
-			return "'''\n" + escaped + "\n'''"
-		}
-		return "'" + escaped + "'"
-	},
+	"bicepQuery": bicepQuery,
+}
+
+// bicepStringEscaper escapes text for a single-quoted Bicep string literal.
+var bicepStringEscaper = strings.NewReplacer(
+	`\`, `\\`,
+	`'`, `\'`,
+	"${", `\${`,
+	"\n", `\n`,
+	"\r", `\r`,
+	"\t", `\t`,
+)
+
+// bicepQuery renders a KQL query as a Bicep string literal whose value is
+// exactly the query text. Multi-line queries use a ''' string, which Bicep
+// takes verbatim (no escapes, no interpolation); the newline right after the
+// opening ''' is ignored and the closing ''' follows the text directly so no
+// newline is added. Queries a ''' string cannot represent fall back to an
+// escaped single-quoted string.
+func bicepQuery(query string) string {
+	if strings.Contains(query, "\n") &&
+		!strings.Contains(query, "'''") &&
+		!strings.HasSuffix(query, "'") {
+		return "'''\n" + query + "'''"
+	}
+	return "'" + bicepStringEscaper.Replace(query) + "'"
 }
 
 var bicepTmpl = template.Must(template.New("bicep").Funcs(bicepFuncs).Parse(`param workspace string
