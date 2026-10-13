@@ -48,10 +48,12 @@ jobs:
 
       - name: Install Bicep CLI
         run: |
-          curl -fsSLo /usr/local/bin/bicep \
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSLo "$RUNNER_TEMP/bin/bicep" \
             "https://github.com/Azure/bicep/releases/download/${BICEP_VERSION}/bicep-linux-x64"
-          chmod +x /usr/local/bin/bicep
-          bicep --version
+          chmod +x "$RUNNER_TEMP/bin/bicep"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/bicep" --version
 
       - name: Build tentacle-conv
         run: go build -o tentacle-conv ./cmd/tentacle-conv
