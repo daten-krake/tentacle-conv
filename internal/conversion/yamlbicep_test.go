@@ -83,6 +83,52 @@ func TestGenerateBicepDSL_SingleLineQuery(t *testing.T) {
 	}
 }
 
+func TestBicepQuery(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{
+			name:  "multi-line keeps quotes verbatim",
+			query: "T\n| where x == 'a'\n",
+			want:  "'''\nT\n| where x == 'a'\n'''",
+		},
+		{
+			name:  "multi-line without trailing newline",
+			query: "T\n| where x == 1",
+			want:  "'''\nT\n| where x == 1'''",
+		},
+		{
+			name:  "multi-line keeps backslashes and interpolation syntax",
+			query: "T\n| where p == @'C:\\Windows' and s == '${x}'\n",
+			want:  "'''\nT\n| where p == @'C:\\Windows' and s == '${x}'\n'''",
+		},
+		{
+			name:  "multi-line ending in quote falls back to escaped string",
+			query: "T\n| where x == 'a'",
+			want:  `'T\n| where x == \'a\''`,
+		},
+		{
+			name:  "multi-line containing ''' falls back to escaped string",
+			query: "print '''\n",
+			want:  `'print \'\'\'\n'`,
+		},
+		{
+			name:  "single-line escapes quotes, backslashes and interpolation",
+			query: `T | where p == 'C:\Win' and s == '${x}'`,
+			want:  `'T | where p == \'C:\\Win\' and s == \'\${x}\''`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := bicepQuery(tt.query); got != tt.want {
+				t.Errorf("bicepQuery(%q)\n got: %s\nwant: %s", tt.query, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestGenerateBicepDSL_EmptyArrays(t *testing.T) {
 	a := model.Analytic{
 		Name:           "No_Mitre",
@@ -130,7 +176,7 @@ func TestGenerateBicepDSL_SpecialChars(t *testing.T) {
 	if !strings.Contains(got, "Rule with ''single quotes'' in name") {
 		t.Error("single quotes should be escaped for description")
 	}
-	if !strings.Contains(got, "SomeTable | where Field == ''value''") {
+	if !strings.Contains(got, `SomeTable | where Field == \'value\'`) {
 		t.Error("single quotes in query should be escaped")
 	}
 	if !strings.Contains(got, "T1059.001") {

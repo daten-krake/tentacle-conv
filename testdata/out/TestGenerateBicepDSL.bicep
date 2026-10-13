@@ -10,8 +10,7 @@ resource alertRule 'Microsoft.OperationalInsights/workspaces/providers/alertRule
     enabled: true
     query: '''
 DeviceProcessEvents
-| where FileName endswith ".pdf.exe"
-'''
+| where FileName endswith ".pdf.exe"'''
     queryFrequency: 'PT20M'
     queryPeriod: 'PT20M'
     triggerOperator: 'GreaterThan'
