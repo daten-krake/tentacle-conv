@@ -33,3 +33,6 @@ go.work.sum
 
 # Tentacle-conv binary
 /tentacle-conv
+
+# Python
+__pycache__/

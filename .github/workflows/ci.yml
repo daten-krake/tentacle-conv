@@ -45,6 +45,9 @@ jobs:
       - name: Test
         run: go test ./... -race -count=1
 
+      - name: Sync script tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
+
       - name: Fuzz escaping functions
         run: |
           for target in FuzzBicepEscape FuzzBicepQuery FuzzSafeFileName; do

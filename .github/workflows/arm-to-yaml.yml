@@ -4,6 +4,11 @@ on:
   push:
     paths:
       - "arm/**"
+      # The converter's output depends on these, so they must re-run the sync.
+      - "cmd/**"
+      - "internal/**"
+      - "go.mod"
+      - "go.sum"
       - "scripts/sync_arm_to_yaml.py"
       - ".github/workflows/arm-to-yaml.yml"
   workflow_dispatch:
@@ -11,6 +16,12 @@ on:
 permissions:
   contents: write
   actions: write
+
+# Two quick pushes must not race for the bot's commit/push. Queue instead of
+# cancelling so every run starts from the latest ref.
+concurrency:
+  group: arm-to-yaml-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   convert:
@@ -57,6 +68,8 @@ jobs:
             echo "No YAML changes to commit"
           else
             git commit -m "auto: convert ARM templates to YAML [skip ci]"
+            # Someone may have pushed while the sync was running.
+            git pull --rebase origin "${GITHUB_REF_NAME}"
             git push origin "HEAD:${GITHUB_REF_NAME}"
             # Pushes made with GITHUB_TOKEN don't trigger pull_request workflows,
             # so start CI explicitly to report the required checks on the new head.
