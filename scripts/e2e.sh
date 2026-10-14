@@ -7,6 +7,7 @@
 #   Bicep              -> compiled ARM  : must compile and match ARM output
 #   testdata/escaping  -> ARM/JSON/Bicep: awkward characters must survive
 #   YAML -> OpenTofu    : fmt-clean and `validate` passes (tofu or terraform)
+#   YAML -> Defender XDR: required properties present, removed ones absent
 #
 # Requires: jq. Bicep checks need `bicep` or `az bicep` on PATH; set
 # REQUIRE_BICEP=1 to fail instead of skipping when neither is available. The
@@ -228,6 +229,27 @@ if [[ -n "$TOFU" ]]; then
     fi
   fi
 fi
+
+# ── 5. Defender XDR ─────────────────────────────────────────────────────────
+# The body must carry the required create properties and none of the
+# properties Microsoft removed on 2026-10-01.
+REMOVED='["isEnabled","period","category","impactedAssets","mitreTechniques","responseActions","detectorId","lastRunDetails","nextRunDateTime"]'
+i=0
+for y in "$ROOT"/yaml/*.yaml "$ROOT"/testdata/escaping/*.yaml; do
+  label="xdr/$(basename "$y")"
+  out="$(convert xdr "$y" "$WORK/xdr/$i")" || { fail "$label: YAML -> XDR failed"; i=$((i + 1)); continue; }
+  i=$((i + 1))
+  if jq -e --argjson removed "$REMOVED" '
+      (.id | length > 0) and (.displayName | length > 0) and (.status | IN("enabled","disabled")) and
+      (.queryCondition.queryText | length > 0) and (.schedule.frequency | length > 0) and
+      (.detectionAction.alertTemplate.severity | IN("informational","low","medium","high")) and
+      ([.. | objects | keys[]] | map(select(. as $k | $removed | index($k))) | length == 0)
+    ' "$out" >/dev/null; then
+    pass "$label: valid Defender XDR rule body"
+  else
+    fail "$label: Defender XDR rule body is invalid or has removed properties"
+  fi
+done
 
 echo
 if [[ $FAILURES -gt 0 ]]; then

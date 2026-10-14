@@ -10,6 +10,7 @@ CLI tool for converting detection rule definitions between YAML, JSON, ARM templ
 | `yaml-to-arm` | YAML → ARM | Converts a prodyaml analytic into an Azure Resource Manager (ARM) template JSON |
 | `yaml-to-json` | YAML → JSON | Converts a prodyaml analytic into a Sentinel API JSON alert rule |
 | `yaml-to-bicep` | YAML → Bicep | Converts a prodyaml analytic into a Bicep alert rule resource |
+| `yaml-to-xdr` | YAML → Defender XDR | Converts a prodyaml analytic into a Defender XDR custom detection rule (Microsoft Graph beta `detectionRules` body) |
 | `yaml-to-tofu` | YAML → OpenTofu | Converts a prodyaml analytic into an OpenTofu/Terraform `azurerm_sentinel_alert_rule_scheduled` resource |
 
 ## Installation
@@ -60,6 +61,14 @@ Convert a prodyaml analytic to a Bicep resource:
 
 ```bash
 tentacle-conv yaml-to-bicep -file rule.yaml -outpath ./output/
+```
+
+Convert a prodyaml analytic to a Defender XDR custom detection rule and create it:
+
+```bash
+tentacle-conv yaml-to-xdr -file rule.yaml -outpath ./xdr/
+az rest --method post --url https://graph.microsoft.com/beta/security/rules/detectionRules \
+  --body @xdr/<rule name>.json
 ```
 
 Convert a prodyaml analytic to an OpenTofu/Terraform configuration:
@@ -122,6 +131,30 @@ The azurerm resource has no sub-technique argument, so sub-techniques are only
 listed in a comment. The generated configuration was validated against azurerm
 5.9.0. azurerm allows at most 10 entity mappings with at most 3 field mappings
 each; more is an error.
+
+**Defender XDR output.** `yaml-to-xdr` targets the beta Graph API
+(`CustomDetection.ReadWrite.All`), uses only the properties that remain after
+Microsoft's 2026-10-01 removals, and prints a warning for everything it drops
+or approximates:
+
+- `id` is the prodyaml `id`, or a slug of the name; `severity` is lowercased.
+- `state: prod` becomes `status: enabled`, any other state `disabled` (with a
+  warning). This differs from the other outputs, which always enable the rule.
+- `query_period` has no XDR field. For `PT1H`, `PT3H`, `PT12H` and `P1D` the
+  lookback is fixed by the service (4 h, 12 h, 48 h, 30 d) and a mismatch is
+  reported. Other frequencies between 5 minutes and 14 days are only valid for
+  queries on Sentinel data and are reported; anything outside is an error.
+  Continuous (NRT) is not produced.
+- MITRE: a mitre entry's techniques are attached to every tactic of that entry
+  (prodyaml does not say which technique belongs to which tactic); sub-techniques
+  go into `subTechniques`.
+- Entity mappings are translated to the typed XDR objects. Identifiers without
+  an XDR column (e.g. Process `CommandLine`, File `Directory`, Account
+  `ObjectGuid`) and entity types without an equivalent (Malware, FileHash,
+  RegistryKey) are reported and skipped. The legacy Account `FullName` becomes
+  `upnColumn` when the column name looks like a UPN and `nameColumn` otherwise.
+- The query is checked for a missing `ReportId` and for `ago()` filters on
+  `Timestamp`/`TimeGenerated`.
 
 ## Development
 

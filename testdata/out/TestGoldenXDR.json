@@ -1,0 +1,72 @@
+{
+  "@odata.type": "#microsoft.graph.security.detectionRule",
+  "id": "EVA-MDFE-01",
+  "displayName": "Golden rule with 'quotes'",
+  "description": "Detects things.\nSecond line with ${braces} and C:\\path.",
+  "status": "enabled",
+  "queryCondition": {
+    "queryText": "DeviceProcessEvents\n| project Timestamp, DeviceId, ReportId, DeviceName, AccountName"
+  },
+  "schedule": {
+    "frequency": "PT1H"
+  },
+  "detectionAction": {
+    "alertTemplate": {
+      "title": "Golden rule with 'quotes'",
+      "description": "Detects things.\nSecond line with ${braces} and C:\\path.",
+      "severity": "medium",
+      "recommendedActions": "Isolate the host.",
+      "entityMappings": {
+        "accounts": [
+          {
+            "nameColumn": "AccountName",
+            "ntDomainColumn": "AccountDomain"
+          }
+        ],
+        "hosts": [
+          {
+            "nameColumn": "DeviceName"
+          }
+        ]
+      },
+      "tactics": [
+        {
+          "tactic": "DefenseEvasion",
+          "techniques": [
+            {
+              "technique": "T1036",
+              "subTechniques": [
+                "T1036.007"
+              ]
+            }
+          ]
+        },
+        {
+          "tactic": "InitialAccess",
+          "techniques": [
+            {
+              "technique": "T1036",
+              "subTechniques": [
+                "T1036.007"
+              ]
+            }
+          ]
+        },
+        {
+          "tactic": "Execution",
+          "techniques": [
+            {
+              "technique": "T1059",
+              "subTechniques": [
+                "T1059.001"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "incidentConfiguration": {
+      "isExcludedFromIncidentCorrelation": false
+    }
+  }
+}
