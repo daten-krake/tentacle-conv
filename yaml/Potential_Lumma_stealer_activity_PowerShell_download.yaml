@@ -84,6 +84,5 @@ query: |-
       | extend HostName= tostring(split(Host, '.', 0)[0]), DnsDomain = tostring(strcat_array(array_slice(split(Host, '.'), 1, -1), '.'))
       | extend Url = extract(@"https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*)",0,Process)
       | extend File = extract(@"([^\/.]+)$|([^\/]+)(\.[^\/.]+)$",0,Url)
-test_block: ""
 query_frequency: PT5M
 query_period: PT30M

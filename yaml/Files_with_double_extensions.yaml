@@ -60,6 +60,5 @@ query: |-
       )on $left.DeviceName == $right.CompromisedEntity
     | extend AccountCustomEntity = AccountName,HostCustomEntity = DeviceName, FileCustomEntity = FileName, InitiatingProcessCustomEntity = InitiatingProcessCommandLine,  ProcessCustomEntity = ProcessCommandLine
     | summarize by AccountCustomEntity, HostCustomEntity, FileCustomEntity, InitiatingProcessCustomEntity, ProcessCustomEntity
-test_block: ""
 query_frequency: PT20M
 query_period: PT20M

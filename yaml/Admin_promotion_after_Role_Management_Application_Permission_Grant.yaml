@@ -115,6 +115,5 @@ query: |-
     | extend RoleAssignment_InitiatingAadUserId = tostring(RoleAssignment_InitiatedBy.user.id)
     | extend RoleAssignment_InitiatingIpAddress = tostring(iff(isnotempty(RoleAssignment_InitiatedBy.user.ipAddress), RoleAssignment_InitiatedBy.user.ipAddress, RoleAssignment_InitiatedBy.app.ipAddress))
     | extend PermissionGrant_AccountName = tostring(split(PermissionGrant_InitiatingUserPrincipalName, "@")[0]), PermissionGrant_AccountUPNSuffix = tostring(split(PermissionGrant_InitiatingUserPrincipalName, "@")[1]), RoleAssignment_AccountName = tostring(split(RoleAssignment_InitiatingUserPrincipalName, "@")[0]), RoleAssignment_AccountUPNSuffix = tostring(split(RoleAssignment_InitiatingUserPrincipalName, "@")[1])
-test_block: ""
 query_frequency: PT1H
 query_period: PT2H
