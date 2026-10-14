@@ -68,4 +68,3 @@ type DataSource struct {
 	EventID   string `yaml:"event_id" json:"event_id"`
 	TableName string `yaml:"table_name" json:"table_name"`
 }
-

@@ -67,7 +67,7 @@ func TestGenerateBicepDSL_SingleLineQuery(t *testing.T) {
 		Description:    "Simple rule",
 		Query:          "SigninLogs | where ResultType == 0",
 		QueryFrequency: "PT1H",
-		QueryPeriod:   "P1D",
+		QueryPeriod:    "P1D",
 	}
 
 	got, err := generateBicepDSL(a)
@@ -162,7 +162,7 @@ func TestGenerateBicepDSL_SpecialChars(t *testing.T) {
 		QueryPeriod:    "P1D",
 		Mitre: []model.Mitre{
 			{
-				Tactics: []string{"Execution"},
+				Tactics:    []string{"Execution"},
 				Techniques: []string{"T1059.001"},
 			},
 		},

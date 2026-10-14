@@ -20,7 +20,7 @@ type SentinelRuleProperties struct {
 	TriggerThreshold      int                           `json:"triggerThreshold"`
 	SuppressionDuration   string                        `json:"suppressionDuration"`
 	SuppressionEnabled    bool                          `json:"suppressionEnabled"`
-	Tactics                []string                      `json:"tactics"`
+	Tactics               []string                      `json:"tactics"`
 	Techniques            []string                      `json:"techniques"`
 	SubTechniques         []string                      `json:"subTechniques"`
 	EntityMappings        []SentinelEntityMapping       `json:"entityMappings"`

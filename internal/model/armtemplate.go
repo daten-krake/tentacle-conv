@@ -5,8 +5,8 @@ package model
 type ARMTemplate struct {
 	Schema         string        `json:"$schema"`
 	ContentVersion string        `json:"contentVersion"`
-	Parameters    any           `json:"parameters"`
-	Resources     []ARMResource `json:"resources"`
+	Parameters     any           `json:"parameters"`
+	Resources      []ARMResource `json:"resources"`
 }
 
 // ARMResource represents a single resource within an ARM template.
@@ -36,8 +36,8 @@ type ARMProperties struct {
 	Techniques            []string              `json:"techniques"`
 	SubTechniques         []string              `json:"subTechniques"`
 	IncidentConfiguration IncidentConfiguration `json:"incidentConfiguration"`
-	EventGroupingSettings  EventGroupingSettings `json:"eventGroupingSettings"`
-	EntityMappings        []ARMEntityMapping   `json:"entityMappings"`
+	EventGroupingSettings EventGroupingSettings `json:"eventGroupingSettings"`
+	EntityMappings        []ARMEntityMapping    `json:"entityMappings"`
 }
 
 // ARMEntityMapping maps an entity type to its field mappings in ARM format.

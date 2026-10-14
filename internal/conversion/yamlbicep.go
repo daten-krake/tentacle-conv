@@ -43,10 +43,10 @@ var bicepStringEscaper = strings.NewReplacer(
 )
 
 // bicepQuery renders a KQL query as a Bicep string literal whose value is
-// exactly the query text. Multi-line queries use a ''' string, which Bicep
+// exactly the query text. Multi-line queries use a ”' string, which Bicep
 // takes verbatim (no escapes, no interpolation); the newline right after the
-// opening ''' is ignored and the closing ''' follows the text directly so no
-// newline is added. Queries a ''' string cannot represent fall back to an
+// opening ”' is ignored and the closing ”' follows the text directly so no
+// newline is added. Queries a ”' string cannot represent fall back to an
 // escaped single-quoted string.
 func bicepQuery(query string) string {
 	if strings.Contains(query, "\n") &&
