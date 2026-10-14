@@ -1,6 +1,6 @@
 package conversion
 
-import "github.com/tentacle-conv/internal/model"
+import "github.com/daten-krake/tentacle-conv/internal/model"
 
 // extractTactics flattens all tactics from a slice of Mitre entries into a
 // single string slice.

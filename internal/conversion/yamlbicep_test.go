@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tentacle-conv/internal/model"
+	"github.com/daten-krake/tentacle-conv/internal/model"
 )
 
 var update = os.Getenv("UPDATE_GOLDEN") == "1"

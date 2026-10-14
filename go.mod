@@ -1,4 +1,4 @@
-module github.com/tentacle-conv
+module github.com/daten-krake/tentacle-conv
 
 go 1.22.2
 

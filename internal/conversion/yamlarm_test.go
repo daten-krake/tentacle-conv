@@ -3,7 +3,7 @@ package conversion
 import (
 	"testing"
 
-	"github.com/tentacle-conv/internal/model"
+	"github.com/daten-krake/tentacle-conv/internal/model"
 )
 
 func sampleAnalytic() model.Analytic {

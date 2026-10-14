@@ -13,7 +13,7 @@ CLI tool for converting detection rule definitions between YAML, JSON, ARM templ
 ## Installation
 
 ```bash
-go install github.com/tentacle-conv/cmd/tentacle-conv@latest
+go install github.com/daten-krake/tentacle-conv/cmd/tentacle-conv@latest
 ```
 
 Or build from source:

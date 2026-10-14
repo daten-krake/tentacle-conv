@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/tentacle-conv/internal/conversion"
-	"github.com/tentacle-conv/internal/model"
+	"github.com/daten-krake/tentacle-conv/internal/conversion"
+	"github.com/daten-krake/tentacle-conv/internal/model"
 )
 
 var (

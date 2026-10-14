@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/tentacle-conv/internal/model"
+	"github.com/daten-krake/tentacle-conv/internal/model"
 	"gopkg.in/yaml.v3"
 )
 
