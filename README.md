@@ -158,6 +158,28 @@ or approximates:
 - The query is checked for a missing `ReportId` and for `ago()` filters on
   `Timestamp`/`TimeGenerated`.
 
+**Entity mapping checks.** Every `yaml-to-*` conversion fails on entity
+mappings that Sentinel cannot accept: more than 10 mappings, more than 3
+identifiers (or none) in one, an unknown `entity_type`, an identifier that does
+not belong to the entity type, a repeated identifier, or an empty `column_name`.
+The vocabulary comes from the Microsoft Sentinel entity reference
+(`internal/model/entities.go`).
+
+`-check-entities` reports everything, including advice, without converting
+anything or needing `-outpath`:
+
+```bash
+tentacle-conv yaml-to-arm -check-entities -file yaml/*.yaml          # Sentinel rules
+tentacle-conv yaml-to-xdr -check-entities -file yaml/*.yaml -strict  # XDR rules, warnings fail
+```
+
+Warnings cover weak-only identification (e.g. an Account mapped by `Name`
+alone), legacy identifiers (`FullName`, `DisplayName`), entities that cannot be
+identified strongly without an internal entity (Process, DNS, RegistryValue),
+mapped columns the query visibly does not return, and, for the XDR target,
+identifiers without an XDR column. The exit code is 1 if any error was found
+(or any warning with `-strict`).
+
 ## Development
 
 ```bash

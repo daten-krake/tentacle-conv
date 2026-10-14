@@ -1,17 +1,13 @@
 package conversion
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/daten-krake/tentacle-conv/internal/model"
-	"gopkg.in/yaml.v3"
 )
 
 // maxFileNameLen bounds the rule-name part of an output file name so the full
@@ -19,22 +15,12 @@ import (
 const maxFileNameLen = 200
 
 // loadAnalytic reads a prodyaml file, rejects unknown fields (so typos such as
-// `query_freqency` are not silently ignored) and validates required fields.
+// `query_freqency` are not silently ignored) and validates required fields and
+// the hard limits of the entity mapping.
 func loadAnalytic(file string) (model.Analytic, error) {
-	var a model.Analytic
-
-	f, err := os.ReadFile(file)
+	a, err := decodeAnalytic(file)
 	if err != nil {
-		return a, fmt.Errorf("reading file %s: %w", file, err)
-	}
-
-	dec := yaml.NewDecoder(bytes.NewReader(f))
-	dec.KnownFields(true)
-	if err := dec.Decode(&a); err != nil {
-		if errors.Is(err, io.EOF) {
-			return a, fmt.Errorf("%s is empty", file)
-		}
-		return a, fmt.Errorf("unmarshaling YAML from %s: %w", file, err)
+		return a, fmt.Errorf("%s: %w", file, err)
 	}
 	if err := a.Validate(); err != nil {
 		return a, fmt.Errorf("invalid rule in %s: %w", file, err)

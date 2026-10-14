@@ -49,6 +49,14 @@ func (a Analytic) Validate() error {
 	errs = appendDurationError(errs, "query_frequency", a.QueryFrequency)
 	errs = appendDurationError(errs, "query_period", a.QueryPeriod)
 
+	for _, issue := range a.EntityMappingIssues() {
+		if issue.Index < 0 {
+			errs = append(errs, fmt.Errorf("entity_mapping: %s", issue.Message))
+		} else {
+			errs = append(errs, fmt.Errorf("entity_mapping[%d] (%s): %s", issue.Index, a.EntityMapping[issue.Index].EntityType, issue.Message))
+		}
+	}
+
 	return errors.Join(errs...)
 }
 

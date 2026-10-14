@@ -21,8 +21,16 @@ type command struct {
 	mode  string // legacy -mode value, e.g. "arm"
 	help  string
 	array bool // accepts -array
+	// check is set for yaml-to-* commands: entity mappings are checked against
+	// this target by -check-entities.
+	check *conversion.EntityTarget
 	run   func(outpath, file string, array bool) error
 }
+
+var (
+	sentinelTarget = conversion.TargetSentinel
+	xdrTarget      = conversion.TargetXDR
+)
 
 var commands = []command{
 	{
@@ -36,35 +44,35 @@ var commands = []command{
 		},
 	},
 	{
-		name: "yaml-to-arm", mode: "arm",
+		name: "yaml-to-arm", mode: "arm", check: &sentinelTarget,
 		help: "convert a prodyaml rule to an ARM template",
 		run: func(outpath, file string, _ bool) error {
 			return conversion.SingleYAMLtoARM(outpath, file)
 		},
 	},
 	{
-		name: "yaml-to-json", mode: "json",
+		name: "yaml-to-json", mode: "json", check: &sentinelTarget,
 		help: "convert a prodyaml rule to a Sentinel REST API JSON rule",
 		run: func(outpath, file string, _ bool) error {
 			return conversion.SingleYAMLtoJSON(outpath, file)
 		},
 	},
 	{
-		name: "yaml-to-tofu", mode: "tofu",
+		name: "yaml-to-tofu", mode: "tofu", check: &sentinelTarget,
 		help: "convert a prodyaml rule to an OpenTofu/Terraform (azurerm) configuration",
 		run: func(outpath, file string, _ bool) error {
 			return conversion.SingleYAMLtoTofu(outpath, file)
 		},
 	},
 	{
-		name: "yaml-to-xdr", mode: "xdr",
+		name: "yaml-to-xdr", mode: "xdr", check: &xdrTarget,
 		help: "convert a prodyaml rule to a Defender XDR custom detection rule (Graph beta JSON)",
 		run: func(outpath, file string, _ bool) error {
 			return conversion.SingleYAMLtoXDR(outpath, file)
 		},
 	},
 	{
-		name: "yaml-to-bicep", mode: "bicep",
+		name: "yaml-to-bicep", mode: "bicep", check: &sentinelTarget,
 		help: "convert a prodyaml rule to a Bicep resource",
 		run: func(outpath, file string, _ bool) error {
 			return conversion.SingleYAMLtoBicep(outpath, file)
@@ -94,7 +102,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if !strings.HasPrefix(args[0], "-") {
-		return runSubcommand(args[0], args[1:], stderr)
+		return runSubcommand(args[0], args[1:], stdout, stderr)
 	}
 	return runLegacy(args, stdout, stderr)
 }
@@ -117,7 +125,7 @@ func findByMode(mode string) *command {
 	return nil
 }
 
-func runSubcommand(name string, args []string, stderr io.Writer) int {
+func runSubcommand(name string, args []string, stdout, stderr io.Writer) int {
 	cmd := findByName(name)
 	if cmd == nil {
 		fmt.Fprintf(stderr, "unknown command %q\n\n", name)
@@ -128,25 +136,64 @@ func runSubcommand(name string, args []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet(cmd.name, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var file, outpath string
-	var array bool
+	var array, checkEntities, strict bool
 	fs.StringVar(&file, "file", "", "path to the input file")
 	fs.StringVar(&outpath, "outpath", "", "directory to write output files (created if missing)")
 	if cmd.array {
 		fs.BoolVar(&array, "array", false, "write every rule of a multi-rule template to its own file")
 	}
+	if cmd.check != nil {
+		fs.BoolVar(&checkEntities, "check-entities", false,
+			"check the rules' entity mappings and report findings; writes no files and needs no -outpath (more -file arguments may follow)")
+		fs.BoolVar(&strict, "strict", false, "with -check-entities: warnings count as failures")
+	}
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, "Usage: tentacle-conv %s -file <input> -outpath <dir>%s\n\n%s\n\n",
-			cmd.name, map[bool]string{true: " [-array]", false: ""}[cmd.array], cmd.help)
+		extra := ""
+		if cmd.array {
+			extra = " [-array]"
+		}
+		if cmd.check != nil {
+			extra += " | -check-entities [-strict] -file <input> [more files]"
+		}
+		fmt.Fprintf(stderr, "Usage: tentacle-conv %s -file <input> -outpath <dir>%s\n\n%s\n\n", cmd.name, extra, cmd.help)
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
-		if err == flag.ErrHelp {
-			return 0
+
+	// Flags may follow the first positional argument (so a shell glob after
+	// -file works with trailing flags); positionals are extra input files.
+	var positional []string
+	rest := args
+	for {
+		if err := fs.Parse(rest); err != nil {
+			if err == flag.ErrHelp {
+				return 0
+			}
+			return 2
 		}
+		if fs.NArg() == 0 {
+			break
+		}
+		positional = append(positional, fs.Arg(0))
+		rest = fs.Args()[1:]
+	}
+
+	if strict && !checkEntities {
+		fmt.Fprintln(stderr, "-strict only applies together with -check-entities")
 		return 2
 	}
-	if fs.NArg() > 0 {
-		fmt.Fprintf(stderr, "unexpected argument %q\n", fs.Arg(0))
+	if checkEntities {
+		files := append([]string{}, positional...)
+		if file != "" {
+			files = append([]string{file}, files...)
+		}
+		if len(files) == 0 {
+			fmt.Fprintln(stderr, "please reference at least one file with -file")
+			return 1
+		}
+		return conversion.CheckEntityFiles(files, *cmd.check, strict, stdout)
+	}
+	if len(positional) > 0 {
+		fmt.Fprintf(stderr, "unexpected argument %q\n", positional[0])
 		return 2
 	}
 

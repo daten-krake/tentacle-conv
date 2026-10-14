@@ -8,6 +8,7 @@
 #   testdata/escaping  -> ARM/JSON/Bicep: awkward characters must survive
 #   YAML -> OpenTofu    : fmt-clean and `validate` passes (tofu or terraform)
 #   YAML -> Defender XDR: required properties present, removed ones absent
+#   -check-entities     : committed rules pass; an unknown entity type fails
 #
 # Requires: jq. Bicep checks need `bicep` or `az bicep` on PATH; set
 # REQUIRE_BICEP=1 to fail instead of skipping when neither is available. The
@@ -250,6 +251,39 @@ for y in "$ROOT"/yaml/*.yaml "$ROOT"/testdata/escaping/*.yaml; do
     fail "$label: Defender XDR rule body is invalid or has removed properties"
   fi
 done
+
+# ── 6. Entity mapping checks ────────────────────────────────────────────────
+# The committed rules must have no entity mapping errors for either target.
+# A rule with an unknown entity type must fail, and must not write files.
+for cmd in yaml-to-arm yaml-to-xdr; do
+  if "$BIN" "$cmd" -check-entities -file "$ROOT"/yaml/*.yaml "$ROOT"/testdata/escaping/*.yaml >"$WORK/entity-$cmd.log" 2>&1; then
+    pass "$cmd -check-entities: no entity mapping errors"
+  else
+    fail "$cmd -check-entities reported errors"
+    grep -i "error" "$WORK/entity-$cmd.log" | head -20 >&2
+  fi
+done
+
+cat >"$WORK/bad-entity.yaml" <<'EOF'
+name: Bad_Entity
+severity: Low
+query: print 1
+query_frequency: PT1H
+query_period: PT1H
+entity_mapping:
+  - entity_type: Hostname
+    field_mapping:
+      - identifier: HostName
+        column_name: C
+EOF
+if "$BIN" yaml-to-arm -check-entities -file "$WORK/bad-entity.yaml" >/dev/null 2>&1; then
+  fail "-check-entities accepted an unknown entity type"
+elif "$BIN" yaml-to-arm -file "$WORK/bad-entity.yaml" -outpath "$WORK/bad-entity-out" >/dev/null 2>&1 ||
+     [[ -e "$WORK/bad-entity-out" ]]; then
+  fail "conversion accepted an unknown entity type or wrote output"
+else
+  pass "unknown entity type is rejected by -check-entities and by conversion"
+fi
 
 echo
 if [[ $FAILURES -gt 0 ]]; then
