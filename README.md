@@ -4,12 +4,12 @@ CLI tool for converting detection rule definitions between YAML, JSON, ARM templ
 
 ## Supported Conversions
 
-| Mode | Direction | Description |
-|------|-----------|-------------|
-| `yaml` | ARM → YAML | Converts an ARM template with one rule, or with `-array` every Scheduled rule of a template, into prodyaml |
-| `arm` | YAML → ARM | Converts a prodyaml analytic into an Azure Resource Manager (ARM) template JSON |
-| `json` | YAML → JSON | Converts a prodyaml analytic into a Sentinel API JSON alert rule |
-| `bicep` | YAML → Bicep | Converts a prodyaml analytic into a Bicep alert rule resource |
+| Command | Direction | Description |
+|---------|-----------|-------------|
+| `arm-to-yaml` | ARM → YAML | Converts an ARM template with one rule, or with `-array` every Scheduled rule of a template, into prodyaml |
+| `yaml-to-arm` | YAML → ARM | Converts a prodyaml analytic into an Azure Resource Manager (ARM) template JSON |
+| `yaml-to-json` | YAML → JSON | Converts a prodyaml analytic into a Sentinel API JSON alert rule |
+| `yaml-to-bicep` | YAML → Bicep | Converts a prodyaml analytic into a Bicep alert rule resource |
 
 ## Installation
 
@@ -26,9 +26,12 @@ make build
 ## Usage
 
 ```
-tentacle-conv -file <input> -outpath <output_dir> -mode <mode> [-array]
-tentacle-conv -version
+tentacle-conv <command> -file <input> -outpath <output_dir> [-array]
+tentacle-conv version
 ```
+
+The earlier form `tentacle-conv -mode yaml|arm|json|bicep ...` still works but
+is deprecated and prints a warning.
 
 ### Flags
 
@@ -36,40 +39,38 @@ tentacle-conv -version
 |------|---------|-------------|
 | `-file` | (required) | Path to the input file |
 | `-outpath` | (required) | Directory to write output files; created if it does not exist |
-| `-mode` | `yaml` | Conversion mode: `yaml`, `arm`, `json`, or `bicep` |
-| `-array` | `false` | With `-mode yaml`: write every Scheduled rule of a multi-rule ARM template to its own YAML file. Other modes reject it |
-| `-version` | | Print the version and exit |
+| `-array` | `false` | `arm-to-yaml` only: write every Scheduled rule of a multi-rule ARM template to its own YAML file |
 
 ### Examples
 
 Convert a prodyaml analytic to an ARM template:
 
 ```bash
-tentacle-conv -file rule.yaml -outpath ./output/ -mode arm
+tentacle-conv yaml-to-arm -file rule.yaml -outpath ./output/
 ```
 
 Convert a prodyaml analytic to a Sentinel API JSON rule:
 
 ```bash
-tentacle-conv -file rule.yaml -outpath ./output/ -mode json
+tentacle-conv yaml-to-json -file rule.yaml -outpath ./output/
 ```
 
 Convert a prodyaml analytic to a Bicep resource:
 
 ```bash
-tentacle-conv -file rule.yaml -outpath ./output/ -mode bicep
+tentacle-conv yaml-to-bicep -file rule.yaml -outpath ./output/
 ```
 
 Convert an ARM template that holds one rule to YAML:
 
 ```bash
-tentacle-conv -file rule.json -outpath ./output/ -mode yaml
+tentacle-conv arm-to-yaml -file rule.json -outpath ./output/
 ```
 
 Convert an ARM template with multiple resources into separate YAML files:
 
 ```bash
-tentacle-conv -file template.json -outpath ./output/ -mode yaml -array
+tentacle-conv arm-to-yaml -file template.json -outpath ./output/ -array
 ```
 
 ## Behaviour worth knowing

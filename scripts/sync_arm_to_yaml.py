@@ -103,7 +103,7 @@ def find_arm_files() -> list[Path]:
 def convert_arm_to_temp(arm_path: Path, tmpdir: Path) -> None:
     cmd = [
         TENTACLE_CONV,
-        "-mode", "yaml",
+        "arm-to-yaml",
         "-array",
         "-file", str(arm_path),
         "-outpath", str(tmpdir),

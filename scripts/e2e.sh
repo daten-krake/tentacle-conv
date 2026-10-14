@@ -51,7 +51,7 @@ FIELDS='{
 convert() {
   local mode="$1" in="$2" out="$3"
   mkdir -p "$out"
-  if ! "$BIN" -mode "$mode" -file "$in" -outpath "$out" 2>"$out.log"; then
+  if ! "$BIN" "yaml-to-$mode" -file "$in" -outpath "$out" 2>"$out.log"; then
     cat "$out.log" >&2
     return 1
   fi
@@ -67,7 +67,7 @@ for arm in "${arm_sources[@]}"; do
   name="$(basename "$arm")"
   ydir="$WORK/rt/$name/yaml"
   mkdir -p "$ydir"
-  if ! "$BIN" -mode yaml -array -file "$arm" -outpath "$ydir" 2>"$WORK/rt-$name.log"; then
+  if ! "$BIN" arm-to-yaml -array -file "$arm" -outpath "$ydir" 2>"$WORK/rt-$name.log"; then
     cat "$WORK/rt-$name.log" >&2
     fail "$name: ARM -> YAML conversion failed"
     continue
