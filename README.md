@@ -10,6 +10,7 @@ CLI tool for converting detection rule definitions between YAML, JSON, ARM templ
 | `yaml-to-arm` | YAML → ARM | Converts a prodyaml analytic into an Azure Resource Manager (ARM) template JSON |
 | `yaml-to-json` | YAML → JSON | Converts a prodyaml analytic into a Sentinel API JSON alert rule |
 | `yaml-to-bicep` | YAML → Bicep | Converts a prodyaml analytic into a Bicep alert rule resource |
+| `yaml-to-tofu` | YAML → OpenTofu | Converts a prodyaml analytic into an OpenTofu/Terraform `azurerm_sentinel_alert_rule_scheduled` resource |
 
 ## Installation
 
@@ -61,6 +62,13 @@ Convert a prodyaml analytic to a Bicep resource:
 tentacle-conv yaml-to-bicep -file rule.yaml -outpath ./output/
 ```
 
+Convert a prodyaml analytic to an OpenTofu/Terraform configuration:
+
+```bash
+tentacle-conv yaml-to-tofu -file rule.yaml -outpath ./tf/
+tofu -chdir=tf init && tofu -chdir=tf plan -var workspace_id=<workspace resource id>
+```
+
 Convert an ARM template that holds one rule to YAML:
 
 ```bash
@@ -103,6 +111,17 @@ YAML → ARM/JSON/Bicep always writes the same fixed defaults for them
 (`enabled: true`, `GreaterThan`/`0`, suppression off with `PT5H`, incident
 creation on with grouping `AllEntities` over `P7D`, `AlertPerResult`). These
 defaults live in `internal/conversion/rule.go`.
+
+**OpenTofu output.** `yaml-to-tofu` writes `<rule name>.tf` with one
+`azurerm_sentinel_alert_rule_scheduled`, and creates `versions.tf` and
+`variables.tf` (declaring `workspace_id`) in the output directory if they do not
+exist yet; existing files are never overwritten. The resource `name` is the rule
+id (see *Rule IDs*), and the resource label is derived from the id, or from the
+name when there is none, so renaming a rule's display name updates it in place.
+The azurerm resource has no sub-technique argument, so sub-techniques are only
+listed in a comment. The generated configuration was validated against azurerm
+5.9.0. azurerm allows at most 10 entity mappings with at most 3 field mappings
+each; more is an error.
 
 ## Development
 

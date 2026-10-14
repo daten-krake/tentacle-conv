@@ -73,6 +73,12 @@ jobs:
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/bin/bicep" --version
 
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.8.5
+          tofu_wrapper: false
+
       - name: Build tentacle-conv
         run: go build -o tentacle-conv ./cmd/tentacle-conv
 
@@ -80,4 +86,5 @@ jobs:
         env:
           TENTACLE_CONV: ${{ github.workspace }}/tentacle-conv
           REQUIRE_BICEP: "1"
+          REQUIRE_TOFU: "1"
         run: bash scripts/e2e.sh

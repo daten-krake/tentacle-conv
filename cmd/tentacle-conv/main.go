@@ -50,6 +50,13 @@ var commands = []command{
 		},
 	},
 	{
+		name: "yaml-to-tofu", mode: "tofu",
+		help: "convert a prodyaml rule to an OpenTofu/Terraform (azurerm) configuration",
+		run: func(outpath, file string, _ bool) error {
+			return conversion.SingleYAMLtoTofu(outpath, file)
+		},
+	},
+	{
 		name: "yaml-to-bicep", mode: "bicep",
 		help: "convert a prodyaml rule to a Bicep resource",
 		run: func(outpath, file string, _ bool) error {
@@ -148,7 +155,7 @@ func runLegacy(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&file, "file", "", "path to the input file")
 	fs.StringVar(&outpath, "outpath", "", "directory to write output files (created if missing)")
 	fs.BoolVar(&array, "array", false, "with -mode yaml: write every rule of a multi-rule ARM template to its own file")
-	fs.StringVar(&mode, "mode", "yaml", "conversion mode: yaml, arm, json, bicep")
+	fs.StringVar(&mode, "mode", "yaml", "conversion mode: yaml, arm, json, bicep, tofu")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -158,7 +165,7 @@ func runLegacy(args []string, stdout, stderr io.Writer) int {
 
 	cmd := findByMode(mode)
 	if cmd == nil {
-		fmt.Fprintf(stderr, "unknown mode %q; supported modes: yaml, arm, json, bicep\n", mode)
+		fmt.Fprintf(stderr, "unknown mode %q; supported modes: yaml, arm, json, bicep, tofu\n", mode)
 		return 1
 	}
 	fmt.Fprintf(stderr, "warning: -mode is deprecated; use 'tentacle-conv %s'\n", cmd.name)

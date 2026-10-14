@@ -6,9 +6,11 @@
 #   YAML (yaml/*.yaml) -> ARM/JSON/Bicep: outputs must be valid and agree
 #   Bicep              -> compiled ARM  : must compile and match ARM output
 #   testdata/escaping  -> ARM/JSON/Bicep: awkward characters must survive
+#   YAML -> OpenTofu    : fmt-clean and `validate` passes (tofu or terraform)
 #
 # Requires: jq. Bicep checks need `bicep` or `az bicep` on PATH; set
-# REQUIRE_BICEP=1 to fail instead of skipping when neither is available.
+# REQUIRE_BICEP=1 to fail instead of skipping when neither is available. The
+# OpenTofu checks need `tofu` or `terraform` (REQUIRE_TOFU=1 to enforce).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -180,6 +182,52 @@ for y in "${escaping_sources[@]}"; do
     fi
   fi
 done
+
+# ── 4. OpenTofu / Terraform ─────────────────────────────────────────────────
+# All generated .tf files go into one directory, which must be fmt-clean and
+# validate against the azurerm provider. Needs `tofu` or `terraform`; set
+# REQUIRE_TOFU=1 to fail instead of skipping when neither is available.
+TOFU=""
+if command -v tofu >/dev/null; then
+  TOFU=tofu
+elif command -v terraform >/dev/null; then
+  TOFU=terraform
+elif [[ "${REQUIRE_TOFU:-0}" == 1 ]]; then
+  echo "tofu/terraform not found and REQUIRE_TOFU=1" >&2
+  exit 1
+else
+  echo "warning: tofu/terraform not found, skipping OpenTofu checks" >&2
+fi
+
+if [[ -n "$TOFU" ]]; then
+  tfdir="$WORK/tofu"
+  mkdir -p "$tfdir"
+  tf_ok=1
+  for y in "$ROOT"/yaml/*.yaml "$ROOT"/testdata/escaping/*.yaml; do
+    if ! "$BIN" yaml-to-tofu -file "$y" -outpath "$tfdir" 2>"$WORK/tofu.log"; then
+      cat "$WORK/tofu.log" >&2
+      fail "$(basename "$y"): YAML -> OpenTofu failed"
+      tf_ok=0
+    fi
+  done
+
+  if [[ $tf_ok -eq 1 ]]; then
+    if "$TOFU" -chdir="$tfdir" fmt -check -diff >"$WORK/tofu-fmt.log" 2>&1; then
+      pass "OpenTofu output is fmt-clean"
+    else
+      fail "OpenTofu output is not fmt-clean"
+      head -40 "$WORK/tofu-fmt.log" >&2
+    fi
+
+    if "$TOFU" -chdir="$tfdir" init -backend=false -input=false -no-color >"$WORK/tofu-init.log" 2>&1 &&
+       "$TOFU" -chdir="$tfdir" validate -no-color >"$WORK/tofu-validate.log" 2>&1; then
+      pass "OpenTofu output validates ($(ls "$tfdir"/*.tf | wc -l | tr -d ' ') files)"
+    else
+      fail "OpenTofu validate failed"
+      cat "$WORK/tofu-init.log" "$WORK/tofu-validate.log" >&2
+    fi
+  fi
+fi
 
 echo
 if [[ $FAILURES -gt 0 ]]; then
