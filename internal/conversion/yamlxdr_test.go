@@ -184,7 +184,10 @@ func TestBuildXDRTactics(t *testing.T) {
 		{Tactics: []string{"Execution", "Persistence"}, Techniques: []string{"T1059.001", "T1059.003", "T1078"}},
 		{Tactics: []string{"Execution"}, Techniques: []string{"T1059.001", "T1204"}},
 	}
-	got := buildXDRTactics(mitre)
+	got, warnings := buildXDRTactics(mitre)
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "mitre[0]") || !strings.Contains(warnings[0], "one mitre entry per tactic") {
+		t.Errorf("expected one ambiguity warning for mitre[0], got %v", warnings)
+	}
 	want := []model.MitreTactic{
 		{Tactic: "Execution", Techniques: []model.MitreTechnique{
 			{Technique: "T1059", SubTechniques: []string{"T1059.001", "T1059.003"}},
@@ -195,6 +198,27 @@ func TestBuildXDRTactics(t *testing.T) {
 			{Technique: "T1059", SubTechniques: []string{"T1059.001", "T1059.003"}},
 			{Technique: "T1078"},
 		}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("tactics =\n%+v\nwant\n%+v", got, want)
+	}
+}
+
+func TestBuildXDRTactics_OneEntryPerTacticIsUnambiguous(t *testing.T) {
+	mitre := []model.Mitre{
+		{Tactics: []string{"DefenseEvasion"}, Techniques: []string{"T1036"}},
+		{Tactics: []string{"InitialAccess"}, Techniques: []string{"T1078"}},
+		{Tactics: []string{"Discovery", "Collection"}}, // no techniques: nothing to pair
+	}
+	got, warnings := buildXDRTactics(mitre)
+	if len(warnings) != 0 {
+		t.Errorf("unexpected warnings: %v", warnings)
+	}
+	want := []model.MitreTactic{
+		{Tactic: "DefenseEvasion", Techniques: []model.MitreTechnique{{Technique: "T1036"}}},
+		{Tactic: "InitialAccess", Techniques: []model.MitreTechnique{{Technique: "T1078"}}},
+		{Tactic: "Discovery"},
+		{Tactic: "Collection"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("tactics =\n%+v\nwant\n%+v", got, want)

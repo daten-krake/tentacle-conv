@@ -145,9 +145,11 @@ or approximates:
   reported. Other frequencies between 5 minutes and 14 days are only valid for
   queries on Sentinel data and are reported; anything outside is an error.
   Continuous (NRT) is not produced.
-- MITRE: a mitre entry's techniques are attached to every tactic of that entry
-  (prodyaml does not say which technique belongs to which tactic); sub-techniques
-  go into `subTechniques`.
+- MITRE: XDR nests techniques under a tactic, but prodyaml's `mitre` entries
+  only list tactics and techniques side by side. An entry's techniques are
+  attached to every tactic of that entry, and an entry with several tactics and
+  techniques produces a warning. Use one `mitre` entry per tactic to pair them
+  exactly. Sub-techniques go into `subTechniques`.
 - Entity mappings are translated to the typed XDR objects. Identifiers without
   an XDR column (e.g. Process `CommandLine`, File `Directory`, Account
   `ObjectGuid`) and entity types without an equivalent (Malware, FileHash,

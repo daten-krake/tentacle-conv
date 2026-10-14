@@ -194,11 +194,19 @@ func buildXDREntityMappings(input []model.Entities) (model.EntityMappingConfigur
 // buildXDRTactics nests each prodyaml mitre entry's techniques under every
 // tactic of that entry. prodyaml does not record which technique belongs to
 // which tactic, so an entry's techniques are attached to all of its tactics.
-func buildXDRTactics(mitre []model.Mitre) []model.MitreTactic {
+// An entry with several tactics and techniques is therefore ambiguous; it is
+// reported, since one entry per tactic pairs them exactly.
+func buildXDRTactics(mitre []model.Mitre) ([]model.MitreTactic, []string) {
 	var out []model.MitreTactic
+	var warnings []string
 	index := map[string]int{}
 
-	for _, m := range mitre {
+	for i, m := range mitre {
+		if len(m.Tactics) > 1 && len(m.Techniques) > 0 {
+			warnings = append(warnings, fmt.Sprintf(
+				"mitre[%d]: %d tactics share %d techniques, so XDR lists every technique under every tactic of this entry; use one mitre entry per tactic to pair them exactly",
+				i, len(m.Tactics), len(m.Techniques)))
+		}
 		// Parent technique -> sub-techniques, in first-seen order.
 		var order []string
 		subs := map[string][]string{}
@@ -225,7 +233,7 @@ func buildXDRTactics(mitre []model.Mitre) []model.MitreTactic {
 			}
 		}
 	}
-	return out
+	return out, warnings
 }
 
 func mergeXDRTechnique(list []model.MitreTechnique, parent string, subs []string) []model.MitreTechnique {
@@ -311,6 +319,8 @@ func yamlToXDR(a model.Analytic) (model.DetectionRule, []string, error) {
 
 	mappings, w := buildXDREntityMappings(a.EntityMapping)
 	warnings = append(warnings, w...)
+	tactics, w := buildXDRTactics(a.Mitre)
+	warnings = append(warnings, w...)
 
 	rule := model.DetectionRule{
 		ODataType:      xdrODataType,
@@ -327,7 +337,7 @@ func yamlToXDR(a model.Analytic) (model.DetectionRule, []string, error) {
 				Severity:           strings.ToLower(a.Severity),
 				RecommendedActions: a.ResponsePlan,
 				EntityMappings:     mappings,
-				Tactics:            buildXDRTactics(a.Mitre),
+				Tactics:            tactics,
 			},
 			IncidentConfiguration: model.XDRIncidentConfiguration{IsExcludedFromIncidentCorrelation: false},
 		},
