@@ -6,9 +6,10 @@ CLI tool for converting detection rule definitions between YAML, JSON, ARM templ
 
 | Mode | Direction | Description |
 |------|-----------|-------------|
-| `yaml` | JSON → YAML | Converts a single JSON file to YAML, or an ARM template with multiple resources into separate YAML files |
+| `yaml` | ARM → YAML | Converts an ARM template with one rule, or with `-array` every Scheduled rule of a template, into prodyaml |
 | `arm` | YAML → ARM | Converts a prodyaml analytic into an Azure Resource Manager (ARM) template JSON |
 | `json` | YAML → JSON | Converts a prodyaml analytic into a Sentinel API JSON alert rule |
+| `bicep` | YAML → Bicep | Converts a prodyaml analytic into a Bicep alert rule resource |
 
 ## Installation
 
@@ -26,6 +27,7 @@ make build
 
 ```
 tentacle-conv -file <input> -outpath <output_dir> -mode <mode> [-array]
+tentacle-conv -version
 ```
 
 ### Flags
@@ -33,9 +35,10 @@ tentacle-conv -file <input> -outpath <output_dir> -mode <mode> [-array]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-file` | (required) | Path to the input file |
-| `-outpath` | (required) | Directory to write output files |
-| `-mode` | `yaml` | Conversion mode: `yaml`, `arm`, or `json` |
-| `-array` | `false` | Split a multi-resource ARM template into separate YAML files |
+| `-outpath` | (required) | Directory to write output files; created if it does not exist |
+| `-mode` | `yaml` | Conversion mode: `yaml`, `arm`, `json`, or `bicep` |
+| `-array` | `false` | With `-mode yaml`: write every Scheduled rule of a multi-rule ARM template to its own YAML file. Other modes reject it |
+| `-version` | | Print the version and exit |
 
 ### Examples
 
@@ -51,7 +54,13 @@ Convert a prodyaml analytic to a Sentinel API JSON rule:
 tentacle-conv -file rule.yaml -outpath ./output/ -mode json
 ```
 
-Convert a single JSON file to YAML:
+Convert a prodyaml analytic to a Bicep resource:
+
+```bash
+tentacle-conv -file rule.yaml -outpath ./output/ -mode bicep
+```
+
+Convert an ARM template that holds one rule to YAML:
 
 ```bash
 tentacle-conv -file rule.json -outpath ./output/ -mode yaml
@@ -62,6 +71,37 @@ Convert an ARM template with multiple resources into separate YAML files:
 ```bash
 tentacle-conv -file template.json -outpath ./output/ -mode yaml -array
 ```
+
+## Behaviour worth knowing
+
+**Input validation.** prodyaml files are decoded strictly: unknown keys (for
+example a typo such as `query_freqency`) are an error. `name`, `query`,
+`severity` (`Informational`, `Low`, `Medium`, `High`), `query_frequency` and
+`query_period` (ISO 8601 durations such as `PT1H`, `P1D`) are required.
+
+**Rule IDs.** The ARM/Bicep resource name is the rule's `id`. If `id` is empty
+a stable GUID is derived from the rule name, so renaming a rule's display name
+does not create a second rule. `id` may only contain letters, digits, `.`, `_`
+and `-`. When converting ARM → YAML the ID is read from the resource name.
+
+**Output file names.** Files are named after the rule name. Path separators and
+characters reserved on common filesystems become `_`. With `-array`, two rules
+that would produce the same file name are an error and nothing is written.
+
+**MITRE sub-techniques.** `T1059.001` in prodyaml is written as the parent
+`T1059` in `techniques` and the full ID in `subTechniques`. ARM → YAML merges
+both back into the prodyaml `techniques` list.
+
+**ARM → YAML only converts `Scheduled` rules.** Other kinds (NRT, Fusion, ...)
+and non-rule resources are skipped with a warning.
+
+**Settings prodyaml does not model are not round-tripped.** ARM → YAML drops
+`enabled`, `triggerOperator`, `triggerThreshold`, `suppressionEnabled`,
+`suppressionDuration`, `incidentConfiguration` and `eventGroupingSettings`.
+YAML → ARM/JSON/Bicep always writes the same fixed defaults for them
+(`enabled: true`, `GreaterThan`/`0`, suppression off with `PT5H`, incident
+creation on with grouping `AllEntities` over `P7D`, `AlertPerResult`). These
+defaults live in `internal/conversion/rule.go`.
 
 ## Development
 

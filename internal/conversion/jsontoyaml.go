@@ -5,91 +5,185 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/daten-krake/tentacle-conv/internal/model"
 	"gopkg.in/yaml.v3"
 )
 
-// SingleJSONtoYAML reads a single JSON file and writes the corresponding YAML
-// representation to outpath.
+// ruleIDFromName extracts the rule ID from an ARM resource name expression such
+// as [concat(parameters('workspace'),'/Microsoft.SecurityInsights/<id>')].
+var ruleIDFromName = regexp.MustCompile(`(?i)(?:^|/)Microsoft\.SecurityInsights/([^'"/\])]+)`)
+
+// armDocument accepts either a full ARM template or a single ARM resource.
+type armDocument struct {
+	model.ARMResource
+	Resources []model.ARMResource `json:"resources"`
+}
+
+// SingleJSONtoYAML reads an ARM template (or bare ARM resource) holding exactly
+// one Scheduled analytics rule and writes it as prodyaml to outpath. Use
+// MultiJSONtoYAML for templates with several rules.
 func SingleJSONtoYAML(outpath string, file string) error {
 	f, err := os.ReadFile(file)
 	if err != nil {
 		return fmt.Errorf("reading file %s: %w", file, err)
 	}
 
-	var data map[string]any
-	err = json.Unmarshal(f, &data)
-	if err != nil {
+	var doc armDocument
+	if err := json.Unmarshal(f, &doc); err != nil {
 		return fmt.Errorf("unmarshaling JSON from %s: %w", file, err)
 	}
 	log.Println("read in: " + file)
 
-	yamlout, err := yaml.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("marshaling YAML: %w", err)
+	resources := doc.Resources
+	if doc.Resources == nil {
+		resources = []model.ARMResource{doc.ARMResource}
 	}
 
-	name, _ := data["name"].(string)
-	if name == "" {
-		name = filepath.Base(file)
+	analytics := scheduledRules(resources)
+	switch len(analytics) {
+	case 0:
+		return fmt.Errorf("%s contains no Scheduled analytics rule", file)
+	case 1:
+	default:
+		return fmt.Errorf("%s contains %d analytics rules; use -array to convert all of them", file, len(analytics))
 	}
 
-	outFile := filepath.Join(outpath, name+".yaml")
-	err = os.WriteFile(outFile, yamlout, 0o644)
-	if err != nil {
-		return fmt.Errorf("writing file %s: %w", outFile, err)
-	}
-	return nil
+	return writeAnalytic(outpath, analytics[0])
 }
 
 // MultiJSONtoYAML reads an ARM template JSON containing multiple resources and
-// writes each as a separate YAML file to outpath.
-func MultiJSONtoYAML(outpath string, file string, arm model.ARMTemplate) error {
+// writes each Scheduled analytics rule as a separate YAML file to outpath.
+// Other resources are skipped. Nothing is written if two rules would produce
+// the same file name.
+func MultiJSONtoYAML(outpath string, file string) error {
 	f, err := os.ReadFile(file)
 	if err != nil {
 		return fmt.Errorf("reading file %s: %w", file, err)
 	}
 
-	err = json.Unmarshal(f, &arm)
-	if err != nil {
+	var arm model.ARMTemplate
+	if err := json.Unmarshal(f, &arm); err != nil {
 		return fmt.Errorf("unmarshaling JSON from %s: %w", file, err)
 	}
 	log.Println("read in: " + file)
 
-	for i := range arm.Resources {
-		yamlout, err := yaml.Marshal(armToAnalytic(arm.Resources[i].Properties))
-		if err != nil {
-			return fmt.Errorf("marshaling YAML for resource %d: %w", i, err)
-		}
+	analytics := scheduledRules(arm.Resources)
+	if len(analytics) == 0 {
+		log.Printf("warning: %s contains no Scheduled analytics rules", file)
+		return nil
+	}
 
-		outFile := filepath.Join(outpath, arm.Resources[i].Properties.DisplayName+".yaml")
-		err = os.WriteFile(outFile, yamlout, 0o644)
+	// Resolve every output path first so a problem leaves no partial output.
+	paths := make([]string, len(analytics))
+	owner := map[string]string{}
+	for i, a := range analytics {
+		p, err := outputPath(outpath, a.Name, "yaml")
 		if err != nil {
-			return fmt.Errorf("writing file %s: %w", outFile, err)
+			return fmt.Errorf("resource %d: %w", i, err)
+		}
+		key := strings.ToLower(p) // case-insensitive filesystems
+		if prev, dup := owner[key]; dup {
+			return fmt.Errorf("rules %q and %q both map to %s", prev, a.Name, p)
+		}
+		owner[key] = a.Name
+		paths[i] = p
+	}
+
+	for i, a := range analytics {
+		yamlout, err := yaml.Marshal(a)
+		if err != nil {
+			return fmt.Errorf("marshaling YAML for rule %q: %w", a.Name, err)
+		}
+		if err := writeFile(outpath, paths[i], yamlout); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-// armToAnalytic converts ARM template properties into a prodyaml Analytic model.
-func armToAnalytic(arm model.ARMProperties) model.Analytic {
+func writeAnalytic(outpath string, a model.Analytic) error {
+	yamlout, err := yaml.Marshal(a)
+	if err != nil {
+		return fmt.Errorf("marshaling YAML: %w", err)
+	}
+	return writeOutput(outpath, a.Name, "yaml", yamlout)
+}
+
+// scheduledRules converts the Scheduled analytics rules among resources,
+// logging a warning for every resource that is skipped.
+func scheduledRules(resources []model.ARMResource) []model.Analytic {
+	var out []model.Analytic
+	for i, r := range resources {
+		if reason := notScheduledRule(r); reason != "" {
+			log.Printf("warning: skipping resource %d (%s): %s", i, resourceLabel(r), reason)
+			continue
+		}
+		out = append(out, armToAnalytic(r))
+	}
+	return out
+}
+
+// notScheduledRule returns why r is not a Scheduled analytics rule, or "" if
+// it is one.
+func notScheduledRule(r model.ARMResource) string {
+	if !strings.HasSuffix(strings.ToLower(r.Type), "/alertrules") {
+		return fmt.Sprintf("type %q is not an analytics rule", r.Type)
+	}
+	if !strings.EqualFold(r.Kind, ruleKind) {
+		return fmt.Sprintf("kind %q is not supported, only %s rules are converted", r.Kind, ruleKind)
+	}
+	return ""
+}
+
+func resourceLabel(r model.ARMResource) string {
+	if r.Properties.DisplayName != "" {
+		return r.Properties.DisplayName
+	}
+	return r.Name
+}
+
+// armToAnalytic converts an ARM resource into a prodyaml Analytic model.
+//
+// prodyaml has no fields for enabled, trigger operator/threshold, suppression,
+// incident configuration or event grouping, so those ARM settings are not
+// carried over; the YAML -> ARM direction applies fixed defaults for them.
+func armToAnalytic(r model.ARMResource) model.Analytic {
+	p := r.Properties
 	return model.Analytic{
-		Name:           arm.DisplayName,
-		Severity:       arm.Severity,
-		Description:    arm.Description,
-		Query:          arm.Query,
-		QueryFrequency: arm.QueryFrequency,
-		QueryPeriod:    arm.QueryPeriod,
+		ID:             ruleIDOf(r),
+		Name:           p.DisplayName,
+		Severity:       p.Severity,
+		Description:    p.Description,
+		Query:          p.Query,
+		QueryFrequency: p.QueryFrequency,
+		QueryPeriod:    p.QueryPeriod,
 		Mitre: []model.Mitre{
 			{
-				Tactics:    arm.Tactics,
-				Techniques: arm.Techniques,
+				Tactics:    p.Tactics,
+				Techniques: mergeTechniques(p.Techniques, p.SubTechniques),
 			},
 		},
-		EntityMapping: buildYamlEntityMappings(arm.EntityMappings),
+		EntityMapping: buildYamlEntityMappings(p.EntityMappings),
 	}
+}
+
+// ruleIDOf returns the rule ID (the last segment of the resource name), or ""
+// when the name is not a literal this converter can read, e.g. a variable.
+func ruleIDOf(r model.ARMResource) string {
+	name := strings.TrimSpace(r.Name)
+	if model.ValidRuleID(name) {
+		return name
+	}
+	if m := ruleIDFromName.FindStringSubmatch(name); m != nil && model.ValidRuleID(m[1]) {
+		return m[1]
+	}
+	if name != "" {
+		log.Printf("warning: cannot read a rule ID from resource name %q; id is left empty", name)
+	}
+	return ""
 }
 
 // buildYamlEntityMappings converts a slice of ARM entity mappings to the

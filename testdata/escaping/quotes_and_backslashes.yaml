@@ -1,0 +1,19 @@
+id: ESC-01
+name: Rule with 'quotes' and \backslashes\ and ${interp}
+severity: Medium
+description: >-
+  It's a "tricky" description: C:\Windows\System32, \\server\share,
+  ${notInterpolated}, $ alone, and a trailing quote'
+query: DeviceFileEvents | where FolderPath startswith 'C:\Windows\' and FileName == "it's.exe" | extend x = "${y}"
+query_frequency: PT1H
+query_period: P1D
+mitre:
+  - tactics: [Execution]
+    techniques: [T1059.001, T1059]
+entity_mapping:
+  - entity_type: File
+    field_mapping:
+      - identifier: Name
+        column_name: "File'Name"
+      - identifier: Directory
+        column_name: 'Folder\Path'

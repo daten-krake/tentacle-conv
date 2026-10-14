@@ -1,0 +1,7 @@
+id: ESC-03
+name: Query ending in quote
+severity: Low
+description: Multi-line query whose last character is a quote.
+query: "SecurityEvent\n| where Account == 'admin'"
+query_frequency: PT1H
+query_period: PT1H

@@ -173,19 +173,23 @@ func TestGenerateBicepDSL_SpecialChars(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !strings.Contains(got, "Rule with ''single quotes'' in name") {
+	if !strings.Contains(got, `Rule with \'single quotes\' in name`) {
 		t.Error("single quotes should be escaped for description")
 	}
 	if !strings.Contains(got, `SomeTable | where Field == \'value\'`) {
 		t.Error("single quotes in query should be escaped")
 	}
-	if !strings.Contains(got, "T1059.001") {
-		t.Error("techniques with dots should be preserved")
+	if !strings.Contains(got, "techniques: ['T1059']") {
+		t.Error("parent technique should be listed in techniques")
+	}
+	if !strings.Contains(got, "subTechniques: ['T1059.001']") {
+		t.Error("sub-technique should be listed in subTechniques")
 	}
 }
 
 func TestGenerateBicepDSL_WorkspaceParam(t *testing.T) {
 	a := model.Analytic{
+		ID:             "Test_Rule",
 		Name:           "Test_Rule",
 		Severity:       "Medium",
 		Description:    "Test",
@@ -231,4 +235,62 @@ func diffBicep(want, got string) string {
 		}
 	}
 	return b.String()
+}
+
+func TestBicepEscape(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"plain", "plain"},
+		{"it's", `it\'s`},
+		{`C:\Windows`, `C:\\Windows`},
+		{"${workspace}", `\${workspace}`},
+		{"$only", "$only"},
+		{"a\nb\r\tc", `a\nb\r\tc`},
+		{`\'`, `\\\'`},
+	}
+	for _, tt := range tests {
+		if got := bicepEscape(tt.in); got != tt.want {
+			t.Errorf("bicepEscape(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+// Every value written into a single-quoted literal must be escaped, not just
+// the description and query (#8).
+func TestGenerateBicepDSL_EscapesEveryField(t *testing.T) {
+	a := model.Analytic{
+		ID:             "it's",
+		Name:           "n'ame",
+		Description:    "d'esc ${x}",
+		Severity:       "H'igh",
+		Query:          "print 'q'",
+		QueryFrequency: "P'T1H",
+		QueryPeriod:    "P'1D",
+		Mitre:          []model.Mitre{{Tactics: []string{"t'ac"}, Techniques: []string{"T1'059.001"}}},
+		EntityMapping: []model.Entities{{
+			EntityType:   "ent'ity",
+			FieldMapping: []model.FieldMapping{{Identifier: "id'ent", ColumnName: `col\'umn`}},
+		}},
+	}
+	got, err := generateBicepDSL(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`Microsoft.SecurityInsights/it\'s'`,
+		`displayName: 'n\'ame'`,
+		`description: 'd\'esc \${x}'`,
+		`severity: 'H\'igh'`,
+		`queryFrequency: 'P\'T1H'`,
+		`queryPeriod: 'P\'1D'`,
+		`tactics: ['t\'ac']`,
+		`techniques: ['T1\'059']`,
+		`subTechniques: ['T1\'059.001']`,
+		`entityType: 'ent\'ity'`,
+		`identifier: 'id\'ent'`,
+		`columnName: 'col\\\'umn'`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output missing %s\n%s", want, got)
+		}
+	}
 }

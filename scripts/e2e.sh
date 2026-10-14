@@ -5,6 +5,7 @@
 #   ARM (arm/*.json)  -> YAML -> ARM   : round-trip must preserve rule fields
 #   YAML (yaml/*.yaml) -> ARM/JSON/Bicep: outputs must be valid and agree
 #   Bicep              -> compiled ARM  : must compile and match ARM output
+#   testdata/escaping  -> ARM/JSON/Bicep: awkward characters must survive
 #
 # Requires: jq. Bicep checks need `bicep` or `az bicep` on PATH; set
 # REQUIRE_BICEP=1 to fail instead of skipping when neither is available.
@@ -42,6 +43,7 @@ fi
 FIELDS='{
   displayName, description, severity, query, queryFrequency, queryPeriod,
   tactics: (.tactics // []), techniques: (.techniques // []),
+  subTechniques: (.subTechniques // []),
   entityMappings: (.entityMappings // [])
 }'
 
@@ -84,8 +86,10 @@ for arm in "${arm_sources[@]}"; do
     i=$((i + 1))
   done
 
-  jq -S "[.resources[].properties | $FIELDS] | sort_by(.displayName)" "$arm" >"$WORK/rt-$name.want"
-  jq -S -s "[.[].resources[].properties | $FIELDS] | sort_by(.displayName)" "$WORK/rt/$name"/arm/*/*.json >"$WORK/rt-$name.got"
+  # Rule IDs (the last segment of the resource name) must survive too.
+  RT='{ id: (.name | sub("^.*/"; "") | sub("\u0027\\)\\]$"; "")), properties: (.properties | '"$FIELDS"') }'
+  jq -S "[.resources[] | $RT] | sort_by(.properties.displayName)" "$arm" >"$WORK/rt-$name.want"
+  jq -S -s "[.[].resources[] | $RT] | sort_by(.properties.displayName)" "$WORK/rt/$name"/arm/*/*.json >"$WORK/rt-$name.got"
   if diff -u "$WORK/rt-$name.want" "$WORK/rt-$name.got" >"$WORK/rt-$name.diff"; then
     pass "$name: ARM -> YAML -> ARM round-trip ($want_count rules)"
   else
@@ -111,9 +115,8 @@ for y in "${yaml_sources[@]}"; do
   jq -S ".resources[0].properties | $FIELDS" "$arm_out" >"$base/arm.fields" \
     || { fail "$label: ARM output is not valid JSON"; continue; }
 
-  # JSON mode does not emit entity mappings yet (#9), so compare the rest.
-  if jq -S ".properties | $FIELDS | del(.entityMappings)" "$json_out" >"$base/json.fields"; then
-    if diff -u <(jq -S 'del(.entityMappings)' "$base/arm.fields") "$base/json.fields" >"$base/json.diff"; then
+  if jq -S ".properties | $FIELDS" "$json_out" >"$base/json.fields"; then
+    if diff -u "$base/arm.fields" "$base/json.fields" >"$base/json.diff"; then
       pass "$label: JSON output matches ARM"
     else
       fail "$label: JSON output differs from ARM"
@@ -124,6 +127,45 @@ for y in "${yaml_sources[@]}"; do
   fi
 
   if [[ ${#BICEP[@]} -gt 0 ]]; then
+    if ! "${BICEP[@]}" "$bicep_out" >"$base/bicep.json" 2>"$base/bicep.log"; then
+      fail "$label: Bicep compilation failed"
+      cat "$base/bicep.log" >&2
+      continue
+    fi
+    jq -S ".resources[0].properties | $FIELDS" "$base/bicep.json" >"$base/bicep.fields"
+    if diff -u "$base/arm.fields" "$base/bicep.fields" >"$base/bicep.diff"; then
+      pass "$label: Bicep compiles and matches ARM"
+    else
+      fail "$label: compiled Bicep differs from ARM"
+      head -30 "$base/bicep.diff" >&2
+    fi
+  fi
+done
+
+# ── 3. Escaping corpus ──────────────────────────────────────────────────────
+# Rules full of quotes, backslashes, "${" and triple quotes must compile to
+# exactly the same rule fields as the (JSON-encoded, hence trustworthy) ARM
+# output.
+escaping_sources=("$ROOT"/testdata/escaping/*.yaml)
+i=0
+for y in "${escaping_sources[@]}"; do
+  label="escaping/$(basename "$y")"
+  base="$WORK/escaping/$i"
+  i=$((i + 1))
+
+  arm_out="$(convert arm "$y" "$base/arm")" || { fail "$label: YAML -> ARM failed"; continue; }
+  json_out="$(convert json "$y" "$base/json")" || { fail "$label: YAML -> JSON failed"; continue; }
+  jq -S ".resources[0].properties | $FIELDS" "$arm_out" >"$base/arm.fields"
+  jq -S ".properties | $FIELDS" "$json_out" >"$base/json.fields"
+  if diff -u "$base/arm.fields" "$base/json.fields" >"$base/json.diff"; then
+    pass "$label: JSON output matches ARM"
+  else
+    fail "$label: JSON output differs from ARM"
+    head -30 "$base/json.diff" >&2
+  fi
+
+  if [[ ${#BICEP[@]} -gt 0 ]]; then
+    bicep_out="$(convert bicep "$y" "$base/bicep")" || { fail "$label: YAML -> Bicep failed"; continue; }
     if ! "${BICEP[@]}" "$bicep_out" >"$base/bicep.json" 2>"$base/bicep.log"; then
       fail "$label: Bicep compilation failed"
       cat "$base/bicep.log" >&2

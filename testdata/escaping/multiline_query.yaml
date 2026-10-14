@@ -1,0 +1,12 @@
+id: ESC-02
+name: Multiline query with triple quotes
+severity: High
+description: "line one\nline two\ttabbed"
+query: |
+  // comment with 'quotes' and \backslashes\ and ${braces}
+  let x = '''not a bicep terminator''';
+  SecurityEvent
+  | where Account has "it's"
+  | where CommandLine contains '\'
+query_frequency: PT5M
+query_period: PT5M

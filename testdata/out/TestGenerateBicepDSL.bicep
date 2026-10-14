@@ -1,7 +1,7 @@
 param workspace string
 
 resource alertRule 'Microsoft.OperationalInsights/workspaces/providers/alertRules@2023-12-01-preview' = {
-  name: '${workspace}/Microsoft.SecurityInsights/Files_with_double_extensions'
+  name: '${workspace}/Microsoft.SecurityInsights/c0a90f5f-389e-5747-89ee-bc47e5abe17b'
   kind: 'Scheduled'
   properties: {
     displayName: 'Files_with_double_extensions'
@@ -19,6 +19,7 @@ DeviceProcessEvents
     suppressionEnabled: false
     tactics: ['DefenseEvasion', 'InitialAccess']
     techniques: ['T1036']
+    subTechniques: []
     entityMappings: [
       {
         entityType: 'Host'

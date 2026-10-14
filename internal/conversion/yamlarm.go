@@ -3,12 +3,9 @@ package conversion
 import (
 	"encoding/json"
 	"fmt"
-	"log"
-	"os"
-	"path/filepath"
+	"strings"
 
 	"github.com/daten-krake/tentacle-conv/internal/model"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -19,33 +16,24 @@ const (
 
 // SingleYAMLtoARM reads a YAML analytic file, converts it to an ARM template
 // JSON, and writes the result to outpath.
-func SingleYAMLtoARM(outpath string, file string, y model.Analytic) error {
-	f, err := os.ReadFile(file)
+func SingleYAMLtoARM(outpath string, file string) error {
+	y, err := loadAnalytic(file)
 	if err != nil {
-		return fmt.Errorf("reading file %s: %w", file, err)
+		return err
 	}
-	err = yaml.Unmarshal(f, &y)
-	if err != nil {
-		return fmt.Errorf("unmarshaling YAML from %s: %w", file, err)
-	}
-	log.Println("read in: " + file)
 
 	jsonout, err := json.Marshal(yamlToArm(y))
 	if err != nil {
 		return fmt.Errorf("marshaling JSON: %w", err)
 	}
 
-	outFile := filepath.Join(outpath, y.Name+".json")
-	err = os.WriteFile(outFile, jsonout, 0o644)
-	if err != nil {
-		return fmt.Errorf("writing file %s: %w", outFile, err)
-	}
-	return nil
+	return writeOutput(outpath, y.Name, "json", jsonout)
 }
 
 // yamlToArm maps a prodyaml Analytic model to a full ARM template including
 // default incident and grouping configuration.
 func yamlToArm(a model.Analytic) model.ARMTemplate {
+	id := ruleID(a)
 	return model.ARMTemplate{
 		Schema:         ARMSchema,
 		ContentVersion: ARMContentVersion,
@@ -56,51 +44,26 @@ func yamlToArm(a model.Analytic) model.ARMTemplate {
 		},
 		Resources: []model.ARMResource{
 			{
-				ID:         createARMId(a),
-				Name:       createARMName(a),
+				ID:         createARMId(id),
+				Name:       createARMName(id),
 				Type:       ARMRuleType,
-				Kind:       "Scheduled",
-				APIVersion: "2023-12-01-preview",
-				Properties: model.ARMProperties{
-					DisplayName:         a.Name,
-					Description:         a.Description,
-					Severity:            a.Severity,
-					Enabled:             true,
-					QueryFrequency:      a.QueryFrequency,
-					QueryPeriod:         a.QueryPeriod,
-					Query:               a.Query,
-					Tactics:             extractTactics(a.Mitre),
-					Techniques:          extractTechniques(a.Mitre),
-					TriggerOperator:     "GreaterThan",
-					TriggerThreshold:    0,
-					SuppressionDuration: "PT5H",
-					SuppressionEnabled:  false,
-					IncidentConfiguration: model.IncidentConfiguration{
-						CreateIncident: true,
-						GroupingConfiguration: model.GroupingConfiguration{
-							Enabled:          true,
-							LookbackDuration: "P7D",
-							MatchingMethod:   "AllEntities",
-						},
-					},
-					EventGroupingSettings: model.EventGroupingSettings{
-						AggregationKind: "AlertPerResult",
-					},
-					EntityMappings: buildARMEntityMappings(a.EntityMapping),
-				},
+				Kind:       ruleKind,
+				APIVersion: ruleAPIVersion,
+				Properties: ruleProperties(a),
 			},
 		},
 	}
 }
 
 // buildARMEntityMappings converts a slice of prodyaml Entities to ARM entity
-// mappings.
+// mappings. The result is never nil, so it serializes as [] rather than null.
 func buildARMEntityMappings(input []model.Entities) []model.ARMEntityMapping {
-	var result []model.ARMEntityMapping
+	result := []model.ARMEntityMapping{}
 
 	for _, em := range input {
 		entity := model.ARMEntityMapping{
-			EntityType: em.EntityType,
+			EntityType:    em.EntityType,
+			FieldMappings: []model.ARMFieldMapping{},
 		}
 
 		for _, fm := range em.FieldMapping {
@@ -116,12 +79,18 @@ func buildARMEntityMappings(input []model.Entities) []model.ARMEntityMapping {
 	return result
 }
 
-// createARMId generates an ARM template resource ID using the analytic name.
-func createARMId(a model.Analytic) string {
-	return fmt.Sprintf("[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/%s')]", a.Name)
+// armEscape escapes a value for use inside a single-quoted literal of an ARM
+// template expression.
+func armEscape(s string) string {
+	return strings.ReplaceAll(s, "'", "''")
 }
 
-// createARMName generates an ARM template resource name using the analytic name.
-func createARMName(a model.Analytic) string {
-	return fmt.Sprintf("[concat(parameters('workspace'),'/Microsoft.SecurityInsights/%s')]", a.Name)
+// createARMId generates an ARM template resource ID for the rule ID.
+func createARMId(id string) string {
+	return fmt.Sprintf("[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/%s')]", armEscape(id))
+}
+
+// createARMName generates an ARM template resource name for the rule ID.
+func createARMName(id string) string {
+	return fmt.Sprintf("[concat(parameters('workspace'),'/Microsoft.SecurityInsights/%s')]", armEscape(id))
 }

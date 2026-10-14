@@ -3,33 +3,29 @@ package conversion
 import (
 	"bytes"
 	"fmt"
-	"log"
-	"os"
-	"path/filepath"
 	"strings"
 	"text/template"
 
 	"github.com/daten-krake/tentacle-conv/internal/model"
-	"gopkg.in/yaml.v3"
 )
 
+// bicepData is the template input: the same rule properties the ARM and REST
+// outputs use, plus the resource name.
 type bicepData struct {
-	Name           string
-	Description    string
-	Severity       string
-	Query          string
-	QueryFrequency string
-	QueryPeriod    string
-	Tactics        []string
-	Techniques     []string
-	EntityMappings []model.Entities
+	ID         string
+	Kind       string
+	APIVersion string
+	Props      model.ARMProperties
 }
 
 var bicepFuncs = template.FuncMap{
-	"bicepEscape": func(s string) string {
-		return strings.ReplaceAll(s, "'", "''")
-	},
-	"bicepQuery": bicepQuery,
+	"bicepEscape": bicepEscape,
+	"bicepQuery":  bicepQuery,
+}
+
+// bicepEscape escapes text for the inside of a single-quoted Bicep string.
+func bicepEscape(s string) string {
+	return bicepStringEscaper.Replace(s)
 }
 
 // bicepStringEscaper escapes text for a single-quoted Bicep string literal.
@@ -54,89 +50,77 @@ func bicepQuery(query string) string {
 		!strings.HasSuffix(query, "'") {
 		return "'''\n" + query + "'''"
 	}
-	return "'" + bicepStringEscaper.Replace(query) + "'"
+	return "'" + bicepEscape(query) + "'"
 }
 
 var bicepTmpl = template.Must(template.New("bicep").Funcs(bicepFuncs).Parse(`param workspace string
 
-resource alertRule 'Microsoft.OperationalInsights/workspaces/providers/alertRules@2023-12-01-preview' = {
-  name: '${workspace}/Microsoft.SecurityInsights/{{.Name}}'
-  kind: 'Scheduled'
+resource alertRule 'Microsoft.OperationalInsights/workspaces/providers/alertRules@{{.APIVersion}}' = {
+  name: '${workspace}/Microsoft.SecurityInsights/{{.ID | bicepEscape}}'
+  kind: '{{.Kind | bicepEscape}}'
   properties: {
-    displayName: '{{.Name | bicepEscape}}'
-    description: '{{.Description | bicepEscape}}'
-    severity: '{{.Severity}}'
-    enabled: true
-    query: {{.Query | bicepQuery}}
-    queryFrequency: '{{.QueryFrequency}}'
-    queryPeriod: '{{.QueryPeriod}}'
-    triggerOperator: 'GreaterThan'
-    triggerThreshold: 0
-    suppressionDuration: 'PT5H'
-    suppressionEnabled: false
-    tactics: [{{range $i, $t := .Tactics}}{{if $i}}, {{end}}'{{$t | bicepEscape}}'{{end}}]
-    techniques: [{{range $i, $t := .Techniques}}{{if $i}}, {{end}}'{{$t | bicepEscape}}'{{end}}]
-    entityMappings: [{{- range .EntityMappings }}
+    displayName: '{{.Props.DisplayName | bicepEscape}}'
+    description: '{{.Props.Description | bicepEscape}}'
+    severity: '{{.Props.Severity | bicepEscape}}'
+    enabled: {{.Props.Enabled}}
+    query: {{.Props.Query | bicepQuery}}
+    queryFrequency: '{{.Props.QueryFrequency | bicepEscape}}'
+    queryPeriod: '{{.Props.QueryPeriod | bicepEscape}}'
+    triggerOperator: '{{.Props.TriggerOperator | bicepEscape}}'
+    triggerThreshold: {{.Props.TriggerThreshold}}
+    suppressionDuration: '{{.Props.SuppressionDuration | bicepEscape}}'
+    suppressionEnabled: {{.Props.SuppressionEnabled}}
+    tactics: [{{range $i, $t := .Props.Tactics}}{{if $i}}, {{end}}'{{$t | bicepEscape}}'{{end}}]
+    techniques: [{{range $i, $t := .Props.Techniques}}{{if $i}}, {{end}}'{{$t | bicepEscape}}'{{end}}]
+    subTechniques: [{{range $i, $t := .Props.SubTechniques}}{{if $i}}, {{end}}'{{$t | bicepEscape}}'{{end}}]
+    entityMappings: [{{- range .Props.EntityMappings }}
       {
-        entityType: '{{.EntityType}}'
-        fieldMappings: [{{- range .FieldMapping }}
+        entityType: '{{.EntityType | bicepEscape}}'
+        fieldMappings: [{{- range .FieldMappings }}
           {
-            identifier: '{{.Identifier}}'
+            identifier: '{{.Identifier | bicepEscape}}'
             columnName: '{{.ColumnName | bicepEscape}}'
           }{{- end }}
         ]
       }{{- end }}
     ]
     incidentConfiguration: {
-      createIncident: true
+      createIncident: {{.Props.IncidentConfiguration.CreateIncident}}
       groupingConfiguration: {
-        enabled: true
-        lookbackDuration: 'P7D'
-        matchingMethod: 'AllEntities'
+        enabled: {{.Props.IncidentConfiguration.GroupingConfiguration.Enabled}}
+        lookbackDuration: '{{.Props.IncidentConfiguration.GroupingConfiguration.LookbackDuration | bicepEscape}}'
+        matchingMethod: '{{.Props.IncidentConfiguration.GroupingConfiguration.MatchingMethod | bicepEscape}}'
       }
     }
     eventGroupingSettings: {
-      aggregationKind: 'AlertPerResult'
+      aggregationKind: '{{.Props.EventGroupingSettings.AggregationKind | bicepEscape}}'
     }
   }
 }
 `))
 
-func SingleYAMLtoBicep(outpath string, file string, y model.Analytic) error {
-	f, err := os.ReadFile(file)
+// SingleYAMLtoBicep reads a YAML analytic file, converts it to a Bicep alert
+// rule resource, and writes the result to outpath.
+func SingleYAMLtoBicep(outpath string, file string) error {
+	y, err := loadAnalytic(file)
 	if err != nil {
-		return fmt.Errorf("reading file %s: %w", file, err)
+		return err
 	}
-	err = yaml.Unmarshal(f, &y)
-	if err != nil {
-		return fmt.Errorf("unmarshaling YAML from %s: %w", file, err)
-	}
-	log.Println("read in: " + file)
 
 	bicepOut, err := generateBicepDSL(y)
 	if err != nil {
 		return fmt.Errorf("generating Bicep DSL: %w", err)
 	}
 
-	outFile := filepath.Join(outpath, y.Name+".bicep")
-	err = os.WriteFile(outFile, []byte(bicepOut), 0o644)
-	if err != nil {
-		return fmt.Errorf("writing file %s: %w", outFile, err)
-	}
-	return nil
+	return writeOutput(outpath, y.Name, "bicep", []byte(bicepOut))
 }
 
 func generateBicepDSL(a model.Analytic) (string, error) {
 	data := bicepData{
-		Name:           a.Name,
-		Description:    a.Description,
-		Severity:       a.Severity,
-		Query:          a.Query,
-		QueryFrequency: a.QueryFrequency,
-		QueryPeriod:    a.QueryPeriod,
-		Tactics:        extractTactics(a.Mitre),
-		Techniques:     extractTechniques(a.Mitre),
-		EntityMappings: a.EntityMapping,
+		ID:         ruleID(a),
+		Kind:       ruleKind,
+		APIVersion: ruleAPIVersion,
+		Props:      ruleProperties(a),
 	}
 
 	var buf bytes.Buffer

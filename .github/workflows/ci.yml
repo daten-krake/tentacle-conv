@@ -45,6 +45,12 @@ jobs:
       - name: Test
         run: go test ./... -race -count=1
 
+      - name: Fuzz escaping functions
+        run: |
+          for target in FuzzBicepEscape FuzzBicepQuery FuzzSafeFileName; do
+            go test ./internal/conversion -run='^$' -fuzz="^${target}\$" -fuzztime=20s
+          done
+
   conversion:
     name: Conversion e2e
     runs-on: ubuntu-latest

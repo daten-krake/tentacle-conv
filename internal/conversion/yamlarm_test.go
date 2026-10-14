@@ -218,8 +218,7 @@ func TestBuildARMEntityMappings(t *testing.T) {
 }
 
 func TestCreateARMId(t *testing.T) {
-	a := model.Analytic{Name: "MyDetectionRule"}
-	result := createARMId(a)
+	result := createARMId("MyDetectionRule")
 	expected := "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/MyDetectionRule')]"
 	if result != expected {
 		t.Errorf("createARMId = %q, want %q", result, expected)
@@ -227,8 +226,7 @@ func TestCreateARMId(t *testing.T) {
 }
 
 func TestCreateARMName(t *testing.T) {
-	a := model.Analytic{Name: "MyDetectionRule"}
-	result := createARMName(a)
+	result := createARMName("MyDetectionRule")
 	expected := "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/MyDetectionRule')]"
 	if result != expected {
 		t.Errorf("createARMName = %q, want %q", result, expected)
